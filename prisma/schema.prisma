@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EventStatus {
+  upcoming
+  completed
+  cancelled
+}
+
+model User {
+  id         String   @id @default(cuid())
+  name       String
+  email      String   @unique
+  role       String   @default("manager")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Venue {
+  id         String   @id @default(cuid())
+  name       String
+  location   String?
+  capacity   Int
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  events     Event[]
+}
+
+model Event {
+  id               String          @id @default(cuid())
+  name             String
+  description      String?
+  date             DateTime
+  start_time       DateTime
+  end_time         DateTime
+  venue_id         String?
+  capacity         Int
+  ticket_price     Decimal         @db.Decimal(10, 2)
+  tickets_sold     Int             @default(0)
+  attendance_count Int             @default(0)
+  revenue          Decimal         @db.Decimal(12, 2) @default(0)
+  status           EventStatus     @default(upcoming)
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+  venue            Venue?          @relation(fields: [venue_id], references: [id], onDelete: SetNull)
+  ticket_sales     TicketSale[]
+  attendance_logs  AttendanceLog[]
+
+  @@index([date])
+  @@index([status])
+}
+
+model TicketSale {
+  id          String   @id @default(cuid())
+  event_id    String
+  quantity    Int
+  total_price Decimal  @db.Decimal(12, 2)
+  created_at  DateTime @default(now())
+  event       Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@index([event_id, created_at])
+}
+
+model AttendanceLog {
+  id           String   @id @default(cuid())
+  event_id     String
+  checkin_time DateTime
+  event        Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@index([event_id, checkin_time])
+}

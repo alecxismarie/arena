@@ -1,26 +1,78 @@
 @import "tailwindcss";
+@import "@fontsource-variable/manrope";
+@import "@fontsource-variable/jetbrains-mono";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f8fc;
+  --foreground: #0f172a;
+  --surface: #f8faff;
+  --surface-soft: #eef4ff;
+  --card: #ffffff;
+  --muted: #eef2f7;
+  --muted-foreground: #5f6f85;
+  --border: #dbe4f0;
+  --accent: #2563eb;
+  --accent-foreground: #f8fafc;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-surface-soft: var(--surface-soft);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --font-sans: "Manrope Variable", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", monospace;
+}
+
+:root.dark {
+  --background: #060c16;
+  --foreground: #e2e8f0;
+  --surface: #081122;
+  --surface-soft: #0b162b;
+  --card: #0e1b31;
+  --muted: #142239;
+  --muted-foreground: #95a3bc;
+  --border: #24324a;
+  --accent: #38bdf8;
+  --accent-foreground: #082f49;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #060c16;
+    --foreground: #e2e8f0;
+    --surface: #081122;
+    --surface-soft: #0b162b;
+    --card: #0e1b31;
+    --muted: #142239;
+    --muted-foreground: #95a3bc;
+    --border: #24324a;
+    --accent: #38bdf8;
+    --accent-foreground: #082f49;
   }
+}
+
+* {
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Manrope Variable", "Segoe UI", sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  letter-spacing: -0.02em;
 }
