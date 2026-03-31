@@ -23,8 +23,8 @@ export default async function EditEventPage({
       event={payload.event}
       venues={venues}
       submitLabel="Save changes"
-      title="Edit Event"
-      description="Update event schedule, attendance, and sales tracking fields."
+      title="Edit event"
+      description="Update schedule and performance inputs."
     />
   );
 }

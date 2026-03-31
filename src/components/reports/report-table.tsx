@@ -1,7 +1,6 @@
 "use client";
 
-import { formatCurrency, formatNumber } from "@/lib/utils";
-import { format } from "date-fns";
+import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
 import { ArrowDownAZ, ArrowUpZA } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -10,19 +9,34 @@ type EventSummaryRow = {
   name: string;
   date: string;
   status: "upcoming" | "completed" | "cancelled";
+  expected_attendees: number;
   tickets_sold: number;
-  attendance_count: number;
+  actual_attendees: number;
+  attendance_variance: number;
+  attendance_rate: number;
   revenue: number;
 };
 
-type SortKey = "name" | "date" | "status" | "tickets" | "attendance" | "revenue";
+type SortKey =
+  | "name"
+  | "date"
+  | "status"
+  | "tickets"
+  | "expected"
+  | "actual"
+  | "variance"
+  | "rate"
+  | "revenue";
 
 const sortOptions: Array<{ key: SortKey; label: string }> = [
   { key: "name", label: "Name" },
   { key: "date", label: "Date" },
   { key: "status", label: "Status" },
   { key: "tickets", label: "Tickets" },
-  { key: "attendance", label: "Attendance" },
+  { key: "expected", label: "Expected" },
+  { key: "actual", label: "Actual" },
+  { key: "variance", label: "Variance" },
+  { key: "rate", label: "Rate" },
   { key: "revenue", label: "Revenue" },
 ];
 
@@ -36,14 +50,28 @@ function compareRows(a: EventSummaryRow, b: EventSummaryRow, key: SortKey) {
       return a.status.localeCompare(b.status);
     case "tickets":
       return a.tickets_sold - b.tickets_sold;
-    case "attendance":
-      return a.attendance_count - b.attendance_count;
+    case "expected":
+      return a.expected_attendees - b.expected_attendees;
+    case "actual":
+      return a.actual_attendees - b.actual_attendees;
+    case "variance":
+      return a.attendance_variance - b.attendance_variance;
+    case "rate":
+      return a.attendance_rate - b.attendance_rate;
     case "revenue":
       return a.revenue - b.revenue;
   }
 }
 
-export function ReportTable({ rows }: { rows: EventSummaryRow[] }) {
+export function ReportTable({
+  rows,
+  currency,
+  timezone,
+}: {
+  rows: EventSummaryRow[];
+  currency?: string;
+  timezone?: string;
+}) {
   const [sortBy, setSortBy] = useState<SortKey>("date");
   const [direction, setDirection] = useState<"asc" | "desc">("desc");
 
@@ -60,8 +88,8 @@ export function ReportTable({ rows }: { rows: EventSummaryRow[] }) {
     <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.7)]">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-base font-semibold text-foreground">Event Summary Report</h3>
-          <p className="text-sm text-muted-foreground">Sortable event performance overview</p>
+          <h3 className="text-base font-semibold text-foreground">Event Performance Table</h3>
+          <p className="text-sm text-muted-foreground">Sortable performance view across events.</p>
         </div>
         <div className="flex items-center gap-2">
           <select
@@ -103,7 +131,10 @@ export function ReportTable({ rows }: { rows: EventSummaryRow[] }) {
               <th className="px-3 py-2">Date</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Tickets</th>
-              <th className="px-3 py-2">Attendance</th>
+              <th className="px-3 py-2">Expected</th>
+              <th className="px-3 py-2">Actual</th>
+              <th className="px-3 py-2">Variance</th>
+              <th className="px-3 py-2">Rate</th>
               <th className="px-3 py-2">Revenue</th>
             </tr>
           </thead>
@@ -112,13 +143,20 @@ export function ReportTable({ rows }: { rows: EventSummaryRow[] }) {
               <tr key={row.id} className="rounded-xl bg-muted/35 text-foreground">
                 <td className="rounded-l-xl px-3 py-3 font-medium">{row.name}</td>
                 <td className="px-3 py-3 text-muted-foreground">
-                  {format(new Date(row.date), "MMM d, yyyy")}
+                  {formatInTimezone(row.date, timezone, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
                 </td>
                 <td className="px-3 py-3 capitalize text-muted-foreground">{row.status}</td>
                 <td className="px-3 py-3">{formatNumber(row.tickets_sold)}</td>
-                <td className="px-3 py-3">{formatNumber(row.attendance_count)}</td>
+                <td className="px-3 py-3">{formatNumber(row.expected_attendees)}</td>
+                <td className="px-3 py-3">{formatNumber(row.actual_attendees)}</td>
+                <td className="px-3 py-3">{formatNumber(row.attendance_variance)}</td>
+                <td className="px-3 py-3">{(row.attendance_rate * 100).toFixed(1)}%</td>
                 <td className="rounded-r-xl px-3 py-3 font-semibold">
-                  {formatCurrency(row.revenue)}
+                  {formatCurrency(row.revenue, currency)}
                 </td>
               </tr>
             ))}

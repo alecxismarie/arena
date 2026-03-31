@@ -22,8 +22,12 @@ import {
 
 const palette = ["#2563eb", "#06b6d4", "#14b8a6", "#0ea5e9", "#60a5fa", "#22d3ee"];
 
-function valueFormatter(value: number, mode: "number" | "currency") {
-  return mode === "currency" ? formatCurrency(value) : formatNumber(value);
+function valueFormatter(
+  value: number,
+  mode: "number" | "currency",
+  currency?: string,
+) {
+  return mode === "currency" ? formatCurrency(value, currency) : formatNumber(value);
 }
 
 function numericValue(value: unknown) {
@@ -35,9 +39,11 @@ function numericValue(value: unknown) {
 export function RevenueTrendChart({
   weekly,
   monthly,
+  currency,
 }: {
   weekly: Array<{ label: string; revenue: number }>;
   monthly: Array<{ label: string; revenue: number }>;
+  currency?: string;
 }) {
   const [mode, setMode] = useState<"weekly" | "monthly">("weekly");
   const data = mode === "weekly" ? weekly : monthly;
@@ -75,13 +81,15 @@ export function RevenueTrendChart({
             <CartesianGrid strokeDasharray="3 3" stroke="#94a3b81f" />
             <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
             <YAxis
-              tickFormatter={(value) => `$${Math.round(value / 1000)}k`}
+              tickFormatter={(value) => formatCurrency(Math.round(Number(value)), currency)}
               tickLine={false}
               axisLine={false}
               tick={{ fontSize: 12 }}
             />
             <Tooltip
-              formatter={(value) => valueFormatter(numericValue(value), "currency")}
+              formatter={(value) =>
+                valueFormatter(numericValue(value), "currency", currency)
+              }
               contentStyle={{
                 borderRadius: "0.75rem",
                 borderColor: "#cbd5e1",
@@ -207,8 +215,10 @@ export function TicketDistributionChart({
 
 export function EventSalesMiniChart({
   data,
+  currency,
 }: {
   data: Array<{ label: string; tickets: number; revenue: number }>;
+  currency?: string;
 }) {
   return (
     <div className="h-52">
@@ -220,7 +230,7 @@ export function EventSalesMiniChart({
           <Tooltip
             formatter={(value, name) =>
               name === "revenue"
-                ? valueFormatter(numericValue(value), "currency")
+                ? valueFormatter(numericValue(value), "currency", currency)
                 : valueFormatter(numericValue(value), "number")
             }
             contentStyle={{
@@ -242,11 +252,13 @@ export function ReportBarChart({
   valueKey,
   color,
   formatMode = "number",
+  currency,
 }: {
   data: Array<{ name: string; [key: string]: string | number }>;
   valueKey: string;
   color: string;
   formatMode?: "number" | "currency";
+  currency?: string;
 }) {
   return (
     <div className="h-64">
@@ -256,7 +268,9 @@ export function ReportBarChart({
           <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
           <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
           <Tooltip
-            formatter={(value) => valueFormatter(numericValue(value), formatMode)}
+            formatter={(value) =>
+              valueFormatter(numericValue(value), formatMode, currency)
+            }
             contentStyle={{
               borderRadius: "0.75rem",
               borderColor: "#cbd5e1",

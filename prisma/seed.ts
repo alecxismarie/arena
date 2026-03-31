@@ -77,6 +77,7 @@ async function seedEvent({
   const end = setMinutes(setHours(date, endHour), startMinute);
 
   const ticketsSold = Math.floor(capacity * soldRatio);
+  const expectedAttendees = Math.floor(capacity * randomInt(50, 95) / 100);
   const attendanceCount =
     status === "completed" ? Math.floor(ticketsSold * attendanceRatio) : 0;
   const revenue = Number((ticketsSold * ticketPrice).toFixed(2));
@@ -90,6 +91,7 @@ async function seedEvent({
       end_time: end,
       venue_id: venueId,
       capacity,
+      expected_attendees: expectedAttendees,
       ticket_price: ticketPrice,
       tickets_sold: ticketsSold,
       attendance_count: attendanceCount,
@@ -136,6 +138,15 @@ async function main() {
   await prisma.event.deleteMany();
   await prisma.venue.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.workspace.deleteMany();
+
+  await prisma.workspace.create({
+    data: {
+      name: "Signals Workspace",
+      timezone: "UTC",
+      currency: "USD",
+    },
+  });
 
   await prisma.user.create({
     data: {

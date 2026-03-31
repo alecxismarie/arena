@@ -32,8 +32,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <RadioTower className="h-5 w-5" />
             </span>
             <div>
-              <p className="text-sm font-semibold text-foreground">Cockpit Arena</p>
-              <p className="text-xs text-muted-foreground">Venue Intelligence</p>
+              <p className="text-sm font-semibold text-foreground">Signals</p>
+              <p className="text-xs text-muted-foreground">Event Intelligence</p>
             </div>
           </div>
 

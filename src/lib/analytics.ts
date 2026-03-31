@@ -25,9 +25,10 @@ export type EventRecord = {
   end_time: Date;
   status: EventStatus;
   capacity: number;
+  expected_attendees: number;
   ticket_price: number;
   tickets_sold: number;
-  attendance_count: number;
+  actual_attendees: number;
   revenue: number;
   venue: {
     id: string;
@@ -40,6 +41,54 @@ type ReportMetric = {
   value: number;
 };
 
+type HistoricalEventRow = {
+  id: string;
+  name: string;
+  date: Date;
+  end_time: Date;
+  venue_id: string | null;
+  expected_attendees: number;
+  tickets_sold: number;
+  attendance_count: number;
+};
+
+type SimilarityMatchStrategy =
+  | "venue_day_of_week"
+  | "venue_only"
+  | "recent_completed";
+
+type EventIntelligence = {
+  insufficientData: boolean;
+  message: string;
+  sampleSize: number;
+  strategy: SimilarityMatchStrategy | "none";
+  strategyLabel: string;
+  averages: {
+    expected_attendees: number;
+    actual_attendees: number;
+    tickets_sold: number;
+    attendance_rate: number;
+  } | null;
+  turnoutRange: {
+    min: number;
+    max: number;
+    label: string;
+  } | null;
+  expectedComparison: {
+    deltaFromAverage: number;
+    position: "above" | "below" | "aligned";
+  } | null;
+  trend: Array<{
+    id: string;
+    name: string;
+    date: Date;
+    expected_attendees: number;
+    actual_attendees: number;
+    tickets_sold: number;
+    attendance_rate: number;
+  }>;
+};
+
 type EventWithVenue = {
   id: string;
   name: string;
@@ -49,6 +98,7 @@ type EventWithVenue = {
   end_time: Date;
   status: EventStatus;
   capacity: number;
+  expected_attendees: number;
   ticket_price: unknown;
   tickets_sold: number;
   attendance_count: number;
@@ -77,9 +127,10 @@ function toTrend(change: number): Trend {
   return "neutral";
 }
 
-function normalizeEventStatus(eventDate: Date, status: EventStatus) {
+function normalizeEventStatus(endTime: Date, status: EventStatus): EventStatus {
   if (status === "cancelled") return "cancelled";
-  if (eventDate < new Date()) return "completed";
+  if (status === "completed") return "completed";
+  if (endTime < new Date()) return "completed";
   return "upcoming";
 }
 
@@ -91,11 +142,12 @@ function mapEventRecord(event: EventWithVenue): EventRecord {
     date: event.date,
     start_time: event.start_time,
     end_time: event.end_time,
-    status: normalizeEventStatus(event.date, event.status),
+    status: normalizeEventStatus(event.end_time, event.status),
     capacity: event.capacity,
+    expected_attendees: event.expected_attendees,
     ticket_price: toNumber(event.ticket_price),
     tickets_sold: event.tickets_sold,
-    attendance_count: event.attendance_count,
+    actual_attendees: event.attendance_count,
     revenue: toNumber(event.revenue),
     venue: event.venue
       ? {
@@ -106,6 +158,165 @@ function mapEventRecord(event: EventWithVenue): EventRecord {
   };
 }
 
+function calculateAttendanceComparison(expected: number, actual: number) {
+  const variance = actual - expected;
+  const rate = expected > 0 ? actual / expected : 0;
+  return {
+    expected,
+    actual,
+    variance,
+    rate,
+  };
+}
+
+function attendanceRate(actualAttendees: number, expectedAttendees: number) {
+  if (expectedAttendees <= 0) return 0;
+  return actualAttendees / expectedAttendees;
+}
+
+function average(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function percentile(sortedValues: number[], percentileRank: number) {
+  if (sortedValues.length === 0) return 0;
+  const index = Math.floor((sortedValues.length - 1) * percentileRank);
+  return sortedValues[index];
+}
+
+function calculateTurnoutRange(actuals: number[]) {
+  if (actuals.length === 0) return null;
+  const sorted = actuals.slice().sort((a, b) => a - b);
+
+  if (sorted.length >= 6) {
+    const lower = percentile(sorted, 0.2);
+    const upper = percentile(sorted, 0.8);
+    return {
+      min: Math.round(lower),
+      max: Math.round(upper),
+      label: "Typical attendance range (20th-80th percentile)",
+    };
+  }
+
+  return {
+    min: Math.round(sorted[0]),
+    max: Math.round(sorted[sorted.length - 1]),
+    label: "Attendance range (min-max)",
+  };
+}
+
+function pickComparableEvents(
+  currentEvent: EventRecord,
+  historicalRows: HistoricalEventRow[],
+) {
+  const minimumComparableSize = 3;
+  const currentEventWeekday = currentEvent.date.getDay();
+
+  const sameVenueRows = historicalRows.filter(
+    (row) => row.venue_id === (currentEvent.venue?.id ?? null),
+  );
+
+  const sameVenueDayRows = sameVenueRows.filter(
+    (row) => row.date.getDay() === currentEventWeekday,
+  );
+
+  if (sameVenueDayRows.length >= minimumComparableSize) {
+    return {
+      strategy: "venue_day_of_week" as const,
+      strategyLabel: "venue and day of week",
+      rows: sameVenueDayRows,
+    };
+  }
+
+  if (sameVenueRows.length >= minimumComparableSize) {
+    return {
+      strategy: "venue_only" as const,
+      strategyLabel: "venue",
+      rows: sameVenueRows,
+    };
+  }
+
+  return {
+    strategy: "recent_completed" as const,
+    strategyLabel: "recent completed events",
+    rows: historicalRows.slice(0, 12),
+  };
+}
+
+function buildEventIntelligence(
+  currentEvent: EventRecord,
+  historicalRows: HistoricalEventRow[],
+): EventIntelligence {
+  const picked = pickComparableEvents(currentEvent, historicalRows);
+  const comparable = picked.rows.slice(0, 12);
+
+  if (comparable.length < 2) {
+    return {
+      insufficientData: true,
+      message: "Not enough similar event history yet.",
+      sampleSize: comparable.length,
+      strategy: "none",
+      strategyLabel: "insufficient history",
+      averages: null,
+      turnoutRange: null,
+      expectedComparison: null,
+      trend: [],
+    };
+  }
+
+  const comparableRates = comparable.map((row) =>
+    attendanceRate(row.attendance_count, row.expected_attendees),
+  );
+  const averages = {
+    expected_attendees: average(comparable.map((row) => row.expected_attendees)),
+    actual_attendees: average(comparable.map((row) => row.attendance_count)),
+    tickets_sold: average(comparable.map((row) => row.tickets_sold)),
+    attendance_rate: average(comparableRates),
+  };
+
+  const turnoutRange = calculateTurnoutRange(
+    comparable.map((row) => row.attendance_count),
+  );
+
+  const expectedDelta = currentEvent.expected_attendees - averages.expected_attendees;
+  const expectedComparison =
+    Math.abs(expectedDelta) < 1
+      ? {
+          deltaFromAverage: 0,
+          position: "aligned" as const,
+        }
+      : {
+          deltaFromAverage: expectedDelta,
+          position: expectedDelta > 0 ? ("above" as const) : ("below" as const),
+        };
+
+  const trend = comparable
+    .slice()
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map((row) => ({
+      id: row.id,
+      name: row.name,
+      date: row.date,
+      expected_attendees: row.expected_attendees,
+      actual_attendees: row.attendance_count,
+      tickets_sold: row.tickets_sold,
+      attendance_rate: attendanceRate(row.attendance_count, row.expected_attendees),
+    }));
+
+  return {
+    insufficientData: false,
+    message: `Based on ${comparable.length} comparable completed events (${picked.strategyLabel}).`,
+    sampleSize: comparable.length,
+    strategy: picked.strategy,
+    strategyLabel: picked.strategyLabel,
+    averages,
+    turnoutRange,
+    expectedComparison,
+    trend,
+  };
+}
+
 export async function getDashboardData() {
   const now = new Date();
   const weekStart = subDays(now, 7);
@@ -113,51 +324,30 @@ export async function getDashboardData() {
 
   const [
     eventTotals,
-    currentWeekSales,
-    previousWeekSales,
-    currentWeekAttendance,
-    previousWeekAttendance,
+    currentWeekTotals,
+    previousWeekTotals,
     currentWeekEvents,
     previousWeekEvents,
-    recentRevenueRows,
-    recentSalesRows,
+    recentEventRows,
     attendanceRows,
     distributionRows,
   ] = await Promise.all([
     prisma.event.aggregate({
       _count: { id: true },
       _sum: {
+        expected_attendees: true,
         tickets_sold: true,
         attendance_count: true,
         revenue: true,
       },
     }),
-    prisma.ticketSale.aggregate({
-      _sum: {
-        quantity: true,
-        total_price: true,
-      },
-      where: {
-        created_at: {
-          gte: weekStart,
-          lte: now,
-        },
-      },
-    }),
-    prisma.ticketSale.aggregate({
-      _sum: {
-        quantity: true,
-        total_price: true,
-      },
-      where: {
-        created_at: {
-          gte: prevWeekStart,
-          lt: weekStart,
-        },
-      },
-    }),
     prisma.event.aggregate({
-      _sum: { attendance_count: true },
+      _sum: {
+        expected_attendees: true,
+        tickets_sold: true,
+        attendance_count: true,
+        revenue: true,
+      },
       where: {
         date: {
           gte: weekStart,
@@ -166,7 +356,12 @@ export async function getDashboardData() {
       },
     }),
     prisma.event.aggregate({
-      _sum: { attendance_count: true },
+      _sum: {
+        expected_attendees: true,
+        tickets_sold: true,
+        attendance_count: true,
+        revenue: true,
+      },
       where: {
         date: {
           gte: prevWeekStart,
@@ -190,34 +385,20 @@ export async function getDashboardData() {
         },
       },
     }),
-    prisma.ticketSale.findMany({
+    prisma.event.findMany({
       where: {
-        created_at: {
+        date: {
           gte: subMonths(now, 6),
           lte: now,
         },
       },
       select: {
-        created_at: true,
-        total_price: true,
+        date: true,
+        tickets_sold: true,
+        revenue: true,
       },
       orderBy: {
-        created_at: "asc",
-      },
-    }),
-    prisma.ticketSale.findMany({
-      where: {
-        created_at: {
-          gte: subDays(now, 30),
-          lte: now,
-        },
-      },
-      select: {
-        created_at: true,
-        quantity: true,
-      },
-      orderBy: {
-        created_at: "asc",
+        date: "asc",
       },
     }),
     prisma.event.findMany({
@@ -226,9 +407,10 @@ export async function getDashboardData() {
       select: {
         id: true,
         name: true,
+        expected_attendees: true,
         attendance_count: true,
         status: true,
-        date: true,
+        end_time: true,
       },
     }),
     prisma.event.findMany({
@@ -248,16 +430,16 @@ export async function getDashboardData() {
   ]);
 
   const ticketChange = percentageChange(
-    currentWeekSales._sum.quantity ?? 0,
-    previousWeekSales._sum.quantity ?? 0,
+    currentWeekTotals._sum.tickets_sold ?? 0,
+    previousWeekTotals._sum.tickets_sold ?? 0,
   );
   const revenueChange = percentageChange(
-    toNumber(currentWeekSales._sum.total_price),
-    toNumber(previousWeekSales._sum.total_price),
+    toNumber(currentWeekTotals._sum.revenue),
+    toNumber(previousWeekTotals._sum.revenue),
   );
   const attendanceChange = percentageChange(
-    currentWeekAttendance._sum.attendance_count ?? 0,
-    previousWeekAttendance._sum.attendance_count ?? 0,
+    currentWeekTotals._sum.attendance_count ?? 0,
+    previousWeekTotals._sum.attendance_count ?? 0,
   );
   const eventChange = percentageChange(currentWeekEvents, previousWeekEvents);
 
@@ -274,16 +456,14 @@ export async function getDashboardData() {
   const monthlyRevenueMap = new Map<string, number>();
   const salesByDayMap = new Map<string, number>();
 
-  recentRevenueRows.forEach((row) => {
-    const weekKey = format(startOfWeek(row.created_at, { weekStartsOn: 1 }), "yyyy-MM-dd");
-    const monthKey = format(row.created_at, "yyyy-MM");
-    weeklyRevenueMap.set(weekKey, (weeklyRevenueMap.get(weekKey) ?? 0) + toNumber(row.total_price));
-    monthlyRevenueMap.set(monthKey, (monthlyRevenueMap.get(monthKey) ?? 0) + toNumber(row.total_price));
-  });
+  recentEventRows.forEach((row) => {
+    const weekKey = format(startOfWeek(row.date, { weekStartsOn: 1 }), "yyyy-MM-dd");
+    const monthKey = format(row.date, "yyyy-MM");
+    weeklyRevenueMap.set(weekKey, (weeklyRevenueMap.get(weekKey) ?? 0) + toNumber(row.revenue));
+    monthlyRevenueMap.set(monthKey, (monthlyRevenueMap.get(monthKey) ?? 0) + toNumber(row.revenue));
 
-  recentSalesRows.forEach((row) => {
-    const dayKey = format(row.created_at, "yyyy-MM-dd");
-    salesByDayMap.set(dayKey, (salesByDayMap.get(dayKey) ?? 0) + row.quantity);
+    const dayKey = format(row.date, "yyyy-MM-dd");
+    salesByDayMap.set(dayKey, (salesByDayMap.get(dayKey) ?? 0) + row.tickets_sold);
   });
 
   const weeklyRevenueTrend = weeklySlots.map((date) => {
@@ -313,6 +493,9 @@ export async function getDashboardData() {
     };
   });
 
+  const overallExpected = eventTotals._sum.expected_attendees ?? 0;
+  const overallActual = eventTotals._sum.attendance_count ?? 0;
+
   return {
     stats: [
       {
@@ -331,8 +514,8 @@ export async function getDashboardData() {
       },
       {
         key: "attendance",
-        label: "Attendance",
-        value: eventTotals._sum.attendance_count ?? 0,
+        label: "Actual Attendance",
+        value: overallActual,
         change: attendanceChange,
         trend: toTrend(attendanceChange),
       },
@@ -344,15 +527,25 @@ export async function getDashboardData() {
         trend: toTrend(revenueChange),
       },
     ],
+    attendanceComparison: calculateAttendanceComparison(overallExpected, overallActual),
     weeklyRevenueTrend,
     monthlyRevenueTrend,
     salesTrend,
-    attendanceByEvent: attendanceRows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      attendance: row.attendance_count,
-      status: normalizeEventStatus(row.date, row.status),
-    })),
+    attendanceByEvent: attendanceRows.map((row) => {
+      const comparison = calculateAttendanceComparison(
+        row.expected_attendees,
+        row.attendance_count,
+      );
+      return {
+        id: row.id,
+        name: row.name,
+        attendance: row.attendance_count,
+        expected: row.expected_attendees,
+        variance: comparison.variance,
+        rate: comparison.rate,
+        status: normalizeEventStatus(row.end_time, row.status),
+      };
+    }),
     ticketDistribution: distributionRows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -409,45 +602,55 @@ export async function getEventById(eventId: string) {
           name: true,
         },
       },
-      ticket_sales: {
-        orderBy: { created_at: "asc" },
-        select: {
-          id: true,
-          quantity: true,
-          total_price: true,
-          created_at: true,
-        },
-      },
     },
   });
 
   if (!event) return null;
 
-  const salesByDay = new Map<string, { tickets: number; revenue: number }>();
-  event.ticket_sales.forEach((sale) => {
-    const key = format(sale.created_at, "yyyy-MM-dd");
-    const current = salesByDay.get(key) ?? { tickets: 0, revenue: 0 };
-    salesByDay.set(key, {
-      tickets: current.tickets + sale.quantity,
-      revenue: current.revenue + toNumber(sale.total_price),
-    });
+  const mapped = mapEventRecord(event);
+  const historicalRows = await prisma.event.findMany({
+    where: {
+      id: { not: event.id },
+      status: { not: "cancelled" },
+      end_time: { lt: new Date() },
+    },
+    select: {
+      id: true,
+      name: true,
+      date: true,
+      end_time: true,
+      venue_id: true,
+      expected_attendees: true,
+      tickets_sold: true,
+      attendance_count: true,
+    },
+    orderBy: {
+      end_time: "desc",
+    },
+    take: 120,
   });
 
-  const salesTrend = Array.from(salesByDay.entries()).map(([key, value]) => ({
-    label: format(new Date(key), "MMM d"),
-    tickets: value.tickets,
-    revenue: value.revenue,
-  }));
+  const intelligence = buildEventIntelligence(mapped, historicalRows);
 
   return {
-    event: mapEventRecord(event),
-    salesTrend,
-    ticketSalesCount: event.ticket_sales.length,
+    event: mapped,
+    salesTrend: [
+      {
+        label: format(mapped.date, "MMM d"),
+        tickets: mapped.tickets_sold,
+        revenue: mapped.revenue,
+      },
+    ],
+    attendanceComparison: calculateAttendanceComparison(
+      mapped.expected_attendees,
+      mapped.actual_attendees,
+    ),
+    intelligence,
   };
 }
 
 function buildPeriodData(
-  rows: Array<{ created_at: Date; quantity: number; total_price: unknown }>,
+  rows: Array<{ date: Date; tickets_sold: number; revenue: unknown }>,
   period: "week" | "month",
 ) {
   const now = new Date();
@@ -466,12 +669,12 @@ function buildPeriodData(
   rows.forEach((row) => {
     const key =
       period === "week"
-        ? format(startOfWeek(row.created_at, { weekStartsOn: 1 }), "yyyy-MM-dd")
-        : format(row.created_at, "yyyy-MM");
+        ? format(startOfWeek(row.date, { weekStartsOn: 1 }), "yyyy-MM-dd")
+        : format(row.date, "yyyy-MM");
     const current = map.get(key) ?? { tickets: 0, revenue: 0 };
     map.set(key, {
-      tickets: current.tickets + row.quantity,
-      revenue: current.revenue + toNumber(row.total_price),
+      tickets: current.tickets + row.tickets_sold,
+      revenue: current.revenue + toNumber(row.revenue),
     });
   });
 
@@ -490,38 +693,27 @@ function buildPeriodData(
 }
 
 export async function getReportsData() {
-  const [salesRows, events] = await Promise.all([
-    prisma.ticketSale.findMany({
-      where: {
-        created_at: {
-          gte: subMonths(new Date(), 6),
+  const events = await prisma.event.findMany({
+    include: {
+      venue: {
+        select: {
+          id: true,
+          name: true,
         },
       },
-      select: {
-        created_at: true,
-        quantity: true,
-        total_price: true,
-      },
-      orderBy: {
-        created_at: "asc",
-      },
-    }),
-    prisma.event.findMany({
-      include: {
-        venue: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-      orderBy: [{ date: "desc" }, { start_time: "desc" }],
-    }),
-  ]);
+    },
+    orderBy: [{ date: "desc" }, { start_time: "desc" }],
+  });
 
-  const weeklySales = buildPeriodData(salesRows, "week");
-  const monthlySales = buildPeriodData(salesRows, "month");
   const tableRows = events.map((event) => mapEventRecord(event));
+  const periodRows = events.map((event) => ({
+    date: event.date,
+    tickets_sold: event.tickets_sold,
+    revenue: event.revenue,
+  }));
+
+  const weeklySales = buildPeriodData(periodRows, "week");
+  const monthlySales = buildPeriodData(periodRows, "month");
 
   const metrics: ReportMetric[] = [
     {
@@ -533,12 +725,12 @@ export async function getReportsData() {
       value: monthlySales[monthlySales.length - 1]?.tickets ?? 0,
     },
     {
-      label: "Attendance",
-      value: tableRows.reduce((sum, row) => sum + row.attendance_count, 0),
+      label: "Expected Attendance",
+      value: tableRows.reduce((sum, row) => sum + row.expected_attendees, 0),
     },
     {
-      label: "Revenue",
-      value: tableRows.reduce((sum, row) => sum + row.revenue, 0),
+      label: "Actual Attendance",
+      value: tableRows.reduce((sum, row) => sum + row.actual_attendees, 0),
     },
   ];
 
@@ -548,11 +740,11 @@ export async function getReportsData() {
     monthlySales,
     attendanceReport: tableRows
       .slice()
-      .sort((a, b) => b.attendance_count - a.attendance_count)
+      .sort((a, b) => b.actual_attendees - a.actual_attendees)
       .slice(0, 10)
       .map((row) => ({
         name: row.name,
-        attendance: row.attendance_count,
+        attendance: row.actual_attendees,
       })),
     revenueReport: tableRows
       .slice()
@@ -562,7 +754,17 @@ export async function getReportsData() {
         name: row.name,
         revenue: row.revenue,
       })),
-    eventSummaryRows: tableRows,
+    eventSummaryRows: tableRows.map((row) => {
+      const comparison = calculateAttendanceComparison(
+        row.expected_attendees,
+        row.actual_attendees,
+      );
+      return {
+        ...row,
+        attendance_variance: comparison.variance,
+        attendance_rate: comparison.rate,
+      };
+    }),
   };
 }
 

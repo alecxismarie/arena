@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { cn, formatDateKeyInTimezone } from "@/lib/utils";
 import {
   addMonths,
   addWeeks,
@@ -21,7 +21,7 @@ import { useMemo, useState } from "react";
 type CalendarEvent = {
   id: string;
   name: string;
-  date: string;
+  dayKey: string;
   startTime: string;
   status: "upcoming" | "completed" | "cancelled";
 };
@@ -38,7 +38,13 @@ function statusClass(status: CalendarEvent["status"]) {
   return "border-blue-200/90 bg-blue-100/70 text-blue-700";
 }
 
-export function CalendarView({ events }: { events: CalendarEvent[] }) {
+export function CalendarView({
+  events,
+  timezone,
+}: {
+  events: CalendarEvent[];
+  timezone?: string;
+}) {
   const [view, setView] = useState<"month" | "week">("month");
   const [pivotDate, setPivotDate] = useState(new Date());
 
@@ -61,7 +67,7 @@ export function CalendarView({ events }: { events: CalendarEvent[] }) {
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     events.forEach((event) => {
-      const key = format(new Date(event.date), "yyyy-MM-dd");
+      const key = event.dayKey;
       const bucket = map.get(key) ?? [];
       bucket.push(event);
       map.set(key, bucket);
@@ -77,7 +83,7 @@ export function CalendarView({ events }: { events: CalendarEvent[] }) {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-          <p className="text-sm text-muted-foreground">Manage arena event scheduling</p>
+          <p className="text-sm text-muted-foreground">View and manage your event schedule</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-xl border border-border bg-muted/50 p-1">
@@ -154,7 +160,7 @@ export function CalendarView({ events }: { events: CalendarEvent[] }) {
         )}
       >
         {days.map((day) => {
-          const key = format(day, "yyyy-MM-dd");
+          const key = formatDateKeyInTimezone(day, timezone);
           const dayEvents = eventsByDay.get(key) ?? [];
           const mutedMonth =
             view === "month" && day.getMonth() !== pivotDate.getMonth();

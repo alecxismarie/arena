@@ -1,18 +1,30 @@
+import { StatusPill } from "@/components/ui/status-pill";
 import { EventRecord } from "@/lib/analytics";
-import { formatCurrency, formatNumber } from "@/lib/utils";
-import { format } from "date-fns";
+import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
 import { CalendarClock, Users } from "lucide-react";
 import Link from "next/link";
-import { StatusPill } from "@/components/ui/status-pill";
 
-export function EventCard({ event }: { event: EventRecord }) {
+export function EventCard({
+  event,
+  timezone,
+  currency,
+}: {
+  event: EventRecord;
+  timezone?: string;
+  currency?: string;
+}) {
   return (
     <article className="rounded-3xl border border-border/60 bg-card p-5 shadow-[0_8px_20px_-18px_rgba(15,23,42,0.7)] transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-22px_rgba(15,23,42,0.65)]">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-foreground">{event.name}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            {event.venue?.name ?? "Main Arena"} • {format(event.date, "EEE, MMM d")}
+            {event.venue?.name ?? "Signals Venue"} -{" "}
+            {formatInTimezone(event.date, timezone, {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })}
           </p>
         </div>
         <StatusPill status={event.status} />
@@ -21,11 +33,20 @@ export function EventCard({ event }: { event: EventRecord }) {
       <div className="grid gap-3 text-sm sm:grid-cols-2">
         <p className="flex items-center gap-2 text-muted-foreground">
           <CalendarClock className="h-4 w-4 text-accent" />
-          {format(event.start_time, "h:mm a")} - {format(event.end_time, "h:mm a")}
+          {formatInTimezone(event.start_time, timezone, {
+            hour: "numeric",
+            minute: "2-digit",
+          })}{" "}
+          -{" "}
+          {formatInTimezone(event.end_time, timezone, {
+            hour: "numeric",
+            minute: "2-digit",
+          })}
         </p>
         <p className="flex items-center gap-2 text-muted-foreground">
           <Users className="h-4 w-4 text-accent" />
-          {formatNumber(event.attendance_count)} attendees
+          Attendance: {formatNumber(event.actual_attendees)} actual /{" "}
+          {formatNumber(event.expected_attendees)} expected
         </p>
       </div>
 
@@ -40,7 +61,9 @@ export function EventCard({ event }: { event: EventRecord }) {
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Revenue</p>
-          <p className="mt-1 font-semibold text-foreground">{formatCurrency(event.revenue)}</p>
+          <p className="mt-1 font-semibold text-foreground">
+            {formatCurrency(event.revenue, currency)}
+          </p>
         </div>
       </div>
 

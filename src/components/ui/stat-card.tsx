@@ -9,6 +9,7 @@ type StatCardProps = {
   trend: "up" | "down" | "neutral";
   icon: LucideIcon;
   format?: "number" | "currency";
+  currency?: string;
 };
 
 export function StatCard({
@@ -18,12 +19,13 @@ export function StatCard({
   trend,
   icon: Icon,
   format = "number",
+  currency,
 }: StatCardProps) {
   const TrendIcon =
     trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : ArrowRight;
 
   const formattedValue =
-    format === "currency" ? formatCurrency(value) : formatNumber(value);
+    format === "currency" ? formatCurrency(value, currency) : formatNumber(value);
 
   return (
     <article className="group rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_28px_-22px_rgba(15,23,42,0.8)] transition-all hover:-translate-y-0.5 hover:border-border hover:shadow-[0_14px_30px_-24px_rgba(15,23,42,0.65)]">
@@ -49,7 +51,7 @@ export function StatCard({
           <TrendIcon className="mr-0.5 inline h-3.5 w-3.5" />
           {formatPercent(change)}
         </span>
-        <span className="text-muted-foreground">vs last week</span>
+        <span className="text-muted-foreground">week over week</span>
       </p>
     </article>
   );

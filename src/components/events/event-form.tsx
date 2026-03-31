@@ -53,7 +53,7 @@ export function EventForm({
               name="venue_id"
               className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
             >
-              <option value="">Main Arena</option>
+              <option value="">Signals Venue</option>
               {venues.map((venue) => (
                 <option key={venue.id} value={venue.id}>
                   {venue.name} ({venue.capacity})
@@ -109,7 +109,7 @@ export function EventForm({
           </label>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-5">
           <label className="space-y-2 text-sm">
             <span className="font-medium text-foreground">Capacity</span>
             <input
@@ -117,6 +117,18 @@ export function EventForm({
               type="number"
               min={0}
               name="capacity"
+              required
+              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+            />
+          </label>
+
+          <label className="space-y-2 text-sm">
+            <span className="font-medium text-foreground">Expected attendance</span>
+            <input
+              defaultValue={event?.expected_attendees ?? 0}
+              type="number"
+              min={0}
+              name="expected_attendees"
               required
               className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
             />
@@ -148,12 +160,12 @@ export function EventForm({
           </label>
 
           <label className="space-y-2 text-sm">
-            <span className="font-medium text-foreground">Attendance count</span>
+            <span className="font-medium text-foreground">Actual attendance</span>
             <input
-              defaultValue={event?.attendance_count ?? 0}
+              defaultValue={event?.actual_attendees ?? 0}
               type="number"
               min={0}
-              name="attendance_count"
+              name="actual_attendees"
               required
               className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
             />

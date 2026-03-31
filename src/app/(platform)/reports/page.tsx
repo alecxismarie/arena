@@ -6,19 +6,23 @@ import {
 import { ReportTable } from "@/components/reports/report-table";
 import { ChartCard } from "@/components/ui/chart-card";
 import { getReportsData } from "@/lib/analytics";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
+import { getCurrentWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportsPage() {
-  const report = await getReportsData();
+  const [report, workspace] = await Promise.all([
+    getReportsData(),
+    getCurrentWorkspace(),
+  ]);
 
   return (
     <div className="space-y-6">
       <header className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.8)]">
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Reports</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Weekly and monthly sales intelligence with attendance and revenue analysis.
+          Review performance trends and expected vs actual attendance.
         </p>
       </header>
 
@@ -29,11 +33,7 @@ export default async function ReportsPage() {
             className="rounded-2xl border border-border/60 bg-card p-4 shadow-[0_8px_20px_-18px_rgba(15,23,42,0.75)]"
           >
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{metric.label}</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">
-              {metric.label === "Revenue"
-                ? formatCurrency(metric.value)
-                : formatNumber(metric.value)}
-            </p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{formatNumber(metric.value)}</p>
           </article>
         ))}
       </section>
@@ -41,7 +41,7 @@ export default async function ReportsPage() {
       <section className="grid gap-4 xl:grid-cols-7">
         <ChartCard
           title="Weekly Sales Report"
-          subtitle="Ticket sales volume over the last 8 weeks"
+          subtitle="Tickets sold over the last 8 weeks"
           className="xl:col-span-4"
         >
           <SalesTrendChart
@@ -53,7 +53,7 @@ export default async function ReportsPage() {
         </ChartCard>
         <ChartCard
           title="Monthly Sales Report"
-          subtitle="Revenue trend over the last 6 months"
+          subtitle="Revenue over the last 6 months"
           className="xl:col-span-3"
         >
           <RevenueTrendChart
@@ -65,12 +65,13 @@ export default async function ReportsPage() {
               label: row.label,
               revenue: row.revenue,
             }))}
+            currency={workspace?.currency}
           />
         </ChartCard>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <ChartCard title="Attendance Report" subtitle="Top events by attendance">
+        <ChartCard title="Attendance Report" subtitle="Top events by actual attendance">
           <ReportBarChart
             data={report.attendanceReport.map((row) => ({
               name: row.name,
@@ -89,6 +90,7 @@ export default async function ReportsPage() {
             valueKey="revenue"
             color="#14b8a6"
             formatMode="currency"
+            currency={workspace?.currency}
           />
         </ChartCard>
       </section>
@@ -98,6 +100,8 @@ export default async function ReportsPage() {
           ...row,
           date: row.date.toISOString(),
         }))}
+        timezone={workspace?.timezone}
+        currency={workspace?.currency}
       />
     </div>
   );

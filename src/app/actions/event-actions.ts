@@ -13,6 +13,7 @@ type EventPayload = {
   end_time: Date;
   venue_id: string | null;
   capacity: number;
+  expected_attendees: number;
   ticket_price: number;
   tickets_sold: number;
   attendance_count: number;
@@ -41,19 +42,38 @@ function parseTime(value: FormDataEntryValue | null, field: string) {
   if (Number.isNaN(hours) || Number.isNaN(minutes)) {
     throw new Error(`Invalid ${field}`);
   }
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    throw new Error(`Invalid ${field}`);
+  }
   return { hours, minutes };
 }
 
-function parseNumber(
+function parseNonNegativeNumber(
   value: FormDataEntryValue | null,
   field: string,
-  defaultValue = 0,
+  options?: {
+    required?: boolean;
+    integer?: boolean;
+    defaultValue?: number;
+  },
 ) {
-  if (value === null || value === "") return defaultValue;
+  const { required = true, integer = false, defaultValue = 0 } = options ?? {};
+  if (value === null || value === "") {
+    if (!required) return defaultValue;
+    throw new Error(`${field} is required`);
+  }
+
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
     throw new Error(`Invalid ${field}`);
   }
+  if (parsed < 0) {
+    throw new Error(`${field} must be greater than or equal to 0`);
+  }
+  if (integer && !Number.isInteger(parsed)) {
+    throw new Error(`${field} must be a whole number`);
+  }
+
   return parsed;
 }
 
@@ -80,13 +100,37 @@ function buildEventPayload(formData: FormData): EventPayload {
   const end_time = new Date(date);
   end_time.setHours(end.hours, end.minutes, 0, 0);
 
-  const capacity = parseNumber(formData.get("capacity"), "capacity");
-  const ticket_price = parseNumber(formData.get("ticket_price"), "ticket price");
-  const tickets_sold = parseNumber(formData.get("tickets_sold"), "tickets sold");
-  const attendance_count = parseNumber(
-    formData.get("attendance_count"),
-    "attendance count",
+  if (start_time >= end_time) {
+    throw new Error("End time must be later than start time");
+  }
+
+  const capacity = parseNonNegativeNumber(formData.get("capacity"), "capacity", {
+    integer: true,
+  });
+  const expected_attendees = parseNonNegativeNumber(
+    formData.get("expected_attendees"),
+    "expected attendees",
+    { integer: true },
   );
+  const ticket_price = parseNonNegativeNumber(
+    formData.get("ticket_price"),
+    "ticket price",
+  );
+  const tickets_sold = parseNonNegativeNumber(
+    formData.get("tickets_sold"),
+    "tickets sold",
+    { integer: true },
+  );
+  const actual_attendees = parseNonNegativeNumber(
+    formData.get("actual_attendees") ?? formData.get("attendance_count"),
+    "actual attendees",
+    { integer: true },
+  );
+
+  if (tickets_sold > capacity) {
+    throw new Error("Tickets sold cannot exceed capacity");
+  }
+
   const revenue = Number((tickets_sold * ticket_price).toFixed(2));
   const venue_id = String(formData.get("venue_id") ?? "").trim() || null;
 
@@ -98,9 +142,10 @@ function buildEventPayload(formData: FormData): EventPayload {
     end_time,
     venue_id,
     capacity,
+    expected_attendees,
     ticket_price,
     tickets_sold,
-    attendance_count,
+    attendance_count: actual_attendees,
     revenue,
     status: parseStatus(formData.get("status")),
   };

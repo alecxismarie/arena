@@ -12,8 +12,8 @@ export default async function NewEventPage() {
       action={createEventAction}
       venues={venues}
       submitLabel="Create event"
-      title="Create New Event"
-      description="Set schedule, pricing, and capacity for a new live venue event."
+      title="Create event"
+      description="Add the core details to start tracking performance."
     />
   );
 }

@@ -1,6 +1,6 @@
-# Cockpit Arena Analytics Dashboard (Phase 1 MVP)
+# Signals Dashboard (Phase 1 MVP)
 
-Premium SaaS-style analytics dashboard for managing cockpit arena / live venue events.
+Signals is an event performance intelligence platform for live event operations.
 
 ## Stack
 
