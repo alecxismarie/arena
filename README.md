@@ -1,6 +1,6 @@
 # Signals Dashboard (Phase 1 MVP)
 
-Signals is an event performance intelligence platform for live event operations.
+Signals is an event performance intelligence platform for live event operations and helps you understand how your events truly perform.
 
 ## Stack
 
