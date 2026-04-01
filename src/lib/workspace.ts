@@ -1,8 +1,14 @@
 import { prisma } from "@/lib/prisma";
+import { getAuthContext } from "@/lib/auth";
 
 export async function getCurrentWorkspace() {
-  return prisma.workspace.findFirst({
-    orderBy: { created_at: "asc" },
+  const context = await getAuthContext();
+  if (!context) {
+    return null;
+  }
+
+  return prisma.workspace.findUnique({
+    where: { id: context.workspaceId },
     select: {
       id: true,
       name: true,

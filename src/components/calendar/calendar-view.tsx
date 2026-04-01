@@ -35,7 +35,7 @@ function statusClass(status: CalendarEvent["status"]) {
   if (status === "cancelled") {
     return "border-rose-200/90 bg-rose-100/70 text-rose-700";
   }
-  return "border-blue-200/90 bg-blue-100/70 text-blue-700";
+  return "border-accent/40 bg-accent/15 text-[color:var(--color-accent-foreground)]";
 }
 
 export function CalendarView({
@@ -86,13 +86,11 @@ export function CalendarView({
           <p className="text-sm text-muted-foreground">View and manage your event schedule</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-xl border border-border bg-muted/50 p-1">
+          <div className="inline-flex gap-1 rounded-xl border border-border bg-muted/50 p-1">
             <button
               className={cn(
                 "rounded-lg px-3 py-1.5 text-xs font-medium",
-                view === "month"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground",
+                view === "month" ? "btn-primary shadow-sm" : "btn-secondary",
               )}
               onClick={() => setView("month")}
               type="button"
@@ -102,9 +100,7 @@ export function CalendarView({
             <button
               className={cn(
                 "rounded-lg px-3 py-1.5 text-xs font-medium",
-                view === "week"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground",
+                view === "week" ? "btn-primary shadow-sm" : "btn-secondary",
               )}
               onClick={() => setView("week")}
               type="button"
@@ -114,7 +110,7 @@ export function CalendarView({
           </div>
 
           <button
-            className="rounded-xl border border-border bg-background p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="btn-secondary rounded-xl p-2"
             onClick={() =>
               setPivotDate((current) =>
                 view === "month" ? subMonths(current, 1) : subWeeks(current, 1),
@@ -125,7 +121,7 @@ export function CalendarView({
             <ChevronLeft className="h-4 w-4" />
           </button>
           <button
-            className="rounded-xl border border-border bg-background p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="btn-secondary rounded-xl p-2"
             onClick={() =>
               setPivotDate((current) =>
                 view === "month" ? addMonths(current, 1) : addWeeks(current, 1),
@@ -136,7 +132,7 @@ export function CalendarView({
             <ChevronRight className="h-4 w-4" />
           </button>
           <button
-            className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted"
+            className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium text-foreground"
             onClick={() => setPivotDate(new Date())}
             type="button"
           >
@@ -208,7 +204,7 @@ export function CalendarView({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
-        <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-700">
+        <span className="rounded-full border border-accent/35 bg-accent/15 px-2.5 py-1 text-[color:var(--color-accent-foreground)]">
           Upcoming
         </span>
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">

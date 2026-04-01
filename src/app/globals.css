@@ -3,16 +3,20 @@
 @import "@fontsource-variable/jetbrains-mono";
 
 :root {
-  --background: #f6f8fc;
-  --foreground: #0f172a;
-  --surface: #f8faff;
-  --surface-soft: #eef4ff;
-  --card: #ffffff;
-  --muted: #eef2f7;
-  --muted-foreground: #5f6f85;
-  --border: #dbe4f0;
-  --accent: #2563eb;
-  --accent-foreground: #f8fafc;
+  --background: #f3e8e8;
+  --foreground: #1f1711;
+  --surface: #f7ece8;
+  --surface-soft: #f2e2db;
+  --card: #fff8f2;
+  --muted: #efdfd6;
+  --muted-foreground: #675246;
+  --border: #dcc6b8;
+  --accent: #e89a17;
+  --accent-foreground: #281b0b;
+  --button-secondary: #ded0c3;
+  --button-secondary-hover: #d8c7b8;
+  --button-secondary-foreground: #6b5d52;
+  --button-secondary-border: #cdb9a8;
 }
 
 @theme inline {
@@ -31,31 +35,133 @@
 }
 
 :root.dark {
-  --background: #060c16;
-  --foreground: #e2e8f0;
-  --surface: #081122;
-  --surface-soft: #0b162b;
-  --card: #0e1b31;
-  --muted: #142239;
-  --muted-foreground: #95a3bc;
-  --border: #24324a;
-  --accent: #38bdf8;
-  --accent-foreground: #082f49;
+  --background: #f3e8e8;
+  --foreground: #1f1711;
+  --surface: #f7ece8;
+  --surface-soft: #f2e2db;
+  --card: #fff8f2;
+  --muted: #efdfd6;
+  --muted-foreground: #675246;
+  --border: #dcc6b8;
+  --accent: #e89a17;
+  --accent-foreground: #281b0b;
+  --button-secondary: #ded0c3;
+  --button-secondary-hover: #d8c7b8;
+  --button-secondary-foreground: #6b5d52;
+  --button-secondary-border: #cdb9a8;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #060c16;
-    --foreground: #e2e8f0;
-    --surface: #081122;
-    --surface-soft: #0b162b;
-    --card: #0e1b31;
-    --muted: #142239;
-    --muted-foreground: #95a3bc;
-    --border: #24324a;
-    --accent: #38bdf8;
-    --accent-foreground: #082f49;
+    --background: #f3e8e8;
+    --foreground: #1f1711;
+    --surface: #f7ece8;
+    --surface-soft: #f2e2db;
+    --card: #fff8f2;
+    --muted: #efdfd6;
+    --muted-foreground: #675246;
+    --border: #dcc6b8;
+    --accent: #e89a17;
+    --accent-foreground: #281b0b;
+    --button-secondary: #ded0c3;
+    --button-secondary-hover: #d8c7b8;
+    --button-secondary-foreground: #6b5d52;
+    --button-secondary-border: #cdb9a8;
   }
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border: 1px solid transparent;
+  box-shadow:
+    0 1px 0 rgba(31, 23, 17, 0.06),
+    0 8px 16px -12px rgba(181, 113, 18, 0.55);
+  transform: translateY(0);
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 180ms ease,
+    filter 180ms ease,
+    background-color 180ms ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent) 90%, #fff 10%);
+  filter: saturate(1.06);
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(31, 23, 17, 0.07),
+    0 14px 24px -14px rgba(181, 113, 18, 0.65);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  filter: saturate(1.02);
+  box-shadow:
+    0 1px 0 rgba(31, 23, 17, 0.06),
+    0 7px 14px -12px rgba(181, 113, 18, 0.5);
+}
+
+.btn-secondary {
+  background: var(--button-secondary);
+  color: var(--button-secondary-foreground);
+  border: 1px solid var(--button-secondary-border);
+  box-shadow:
+    0 1px 0 rgba(31, 23, 17, 0.04),
+    0 7px 14px -13px rgba(102, 75, 56, 0.35);
+  transform: translateY(0);
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    filter 180ms ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--button-secondary-hover);
+  filter: saturate(1.03);
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(31, 23, 17, 0.05),
+    0 12px 20px -14px rgba(102, 75, 56, 0.45);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow:
+    0 1px 0 rgba(31, 23, 17, 0.04),
+    0 6px 12px -12px rgba(102, 75, 56, 0.32);
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px color-mix(in oklab, var(--accent) 38%, transparent),
+    0 10px 20px -14px rgba(102, 75, 56, 0.42);
+}
+
+.btn-secondary:disabled {
+  color: var(--muted-foreground);
+  filter: saturate(0.85);
+}
+
+a[href],
+button,
+summary,
+label[for],
+select,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+[role="button"] {
+  cursor: url("/cursors/signals-pointer.svg") 4 4, pointer;
+}
+
+button:disabled,
+select:disabled,
+input:disabled {
+  cursor: not-allowed;
 }
 
 * {

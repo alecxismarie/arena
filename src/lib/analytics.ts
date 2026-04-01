@@ -1,5 +1,7 @@
 import { EventStatus } from "@prisma/client";
+import { requireAuthContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getWorkspaceDailyAggregates } from "@/lib/workspace-daily-aggregates";
 import {
   addMonths,
   eachDayOfInterval,
@@ -318,90 +320,23 @@ function buildEventIntelligence(
 }
 
 export async function getDashboardData() {
+  const context = await requireAuthContext();
   const now = new Date();
   const weekStart = subDays(now, 7);
   const prevWeekStart = subDays(now, 14);
+  const aggregateRangeStart = startOfDay(subMonths(now, 6));
+  const aggregateRangeEnd = endOfDay(now);
 
-  const [
-    eventTotals,
-    currentWeekTotals,
-    previousWeekTotals,
-    currentWeekEvents,
-    previousWeekEvents,
-    recentEventRows,
-    attendanceRows,
-    distributionRows,
-  ] = await Promise.all([
-    prisma.event.aggregate({
-      _count: { id: true },
-      _sum: {
-        expected_attendees: true,
-        tickets_sold: true,
-        attendance_count: true,
-        revenue: true,
-      },
-    }),
-    prisma.event.aggregate({
-      _sum: {
-        expected_attendees: true,
-        tickets_sold: true,
-        attendance_count: true,
-        revenue: true,
-      },
-      where: {
-        date: {
-          gte: weekStart,
-          lte: now,
-        },
-      },
-    }),
-    prisma.event.aggregate({
-      _sum: {
-        expected_attendees: true,
-        tickets_sold: true,
-        attendance_count: true,
-        revenue: true,
-      },
-      where: {
-        date: {
-          gte: prevWeekStart,
-          lt: weekStart,
-        },
-      },
-    }),
-    prisma.event.count({
-      where: {
-        date: {
-          gte: weekStart,
-          lte: now,
-        },
-      },
-    }),
-    prisma.event.count({
-      where: {
-        date: {
-          gte: prevWeekStart,
-          lt: weekStart,
-        },
-      },
+  const [dailyAggregateRows, attendanceRows, distributionRows] = await Promise.all([
+    getWorkspaceDailyAggregates({
+      workspaceId: context.workspaceId,
+      from: aggregateRangeStart,
+      to: aggregateRangeEnd,
     }),
     prisma.event.findMany({
       where: {
-        date: {
-          gte: subMonths(now, 6),
-          lte: now,
-        },
+        workspace_id: context.workspaceId,
       },
-      select: {
-        date: true,
-        tickets_sold: true,
-        revenue: true,
-      },
-      orderBy: {
-        date: "asc",
-      },
-    }),
-    prisma.event.findMany({
       take: 8,
       orderBy: [{ attendance_count: "desc" }, { date: "desc" }],
       select: {
@@ -415,6 +350,7 @@ export async function getDashboardData() {
     }),
     prisma.event.findMany({
       where: {
+        workspace_id: context.workspaceId,
         tickets_sold: {
           gt: 0,
         },
@@ -429,19 +365,73 @@ export async function getDashboardData() {
     }),
   ]);
 
+  const eventTotals = dailyAggregateRows.reduce(
+    (acc, row) => ({
+      events: acc.events + row.event_count,
+      expected_attendees: acc.expected_attendees + row.expected_attendees,
+      tickets_sold: acc.tickets_sold + row.tickets_sold,
+      attendance_count: acc.attendance_count + row.attendance_count,
+      revenue: acc.revenue + toNumber(row.revenue),
+    }),
+    {
+      events: 0,
+      expected_attendees: 0,
+      tickets_sold: 0,
+      attendance_count: 0,
+      revenue: 0,
+    },
+  );
+
+  const currentWeekTotals = dailyAggregateRows
+    .filter((row) => row.date >= weekStart && row.date <= now)
+    .reduce(
+      (acc, row) => ({
+        events: acc.events + row.event_count,
+        tickets_sold: acc.tickets_sold + row.tickets_sold,
+        attendance_count: acc.attendance_count + row.attendance_count,
+        revenue: acc.revenue + toNumber(row.revenue),
+      }),
+      {
+        events: 0,
+        tickets_sold: 0,
+        attendance_count: 0,
+        revenue: 0,
+      },
+    );
+
+  const previousWeekTotals = dailyAggregateRows
+    .filter((row) => row.date >= prevWeekStart && row.date < weekStart)
+    .reduce(
+      (acc, row) => ({
+        events: acc.events + row.event_count,
+        tickets_sold: acc.tickets_sold + row.tickets_sold,
+        attendance_count: acc.attendance_count + row.attendance_count,
+        revenue: acc.revenue + toNumber(row.revenue),
+      }),
+      {
+        events: 0,
+        tickets_sold: 0,
+        attendance_count: 0,
+        revenue: 0,
+      },
+    );
+
   const ticketChange = percentageChange(
-    currentWeekTotals._sum.tickets_sold ?? 0,
-    previousWeekTotals._sum.tickets_sold ?? 0,
+    currentWeekTotals.tickets_sold,
+    previousWeekTotals.tickets_sold,
   );
   const revenueChange = percentageChange(
-    toNumber(currentWeekTotals._sum.revenue),
-    toNumber(previousWeekTotals._sum.revenue),
+    currentWeekTotals.revenue,
+    previousWeekTotals.revenue,
   );
   const attendanceChange = percentageChange(
-    currentWeekTotals._sum.attendance_count ?? 0,
-    previousWeekTotals._sum.attendance_count ?? 0,
+    currentWeekTotals.attendance_count,
+    previousWeekTotals.attendance_count,
   );
-  const eventChange = percentageChange(currentWeekEvents, previousWeekEvents);
+  const eventChange = percentageChange(
+    currentWeekTotals.events,
+    previousWeekTotals.events,
+  );
 
   const weeklySlots = eachWeekOfInterval({
     start: startOfWeek(subWeeks(now, 11), { weekStartsOn: 1 }),
@@ -456,7 +446,7 @@ export async function getDashboardData() {
   const monthlyRevenueMap = new Map<string, number>();
   const salesByDayMap = new Map<string, number>();
 
-  recentEventRows.forEach((row) => {
+  dailyAggregateRows.forEach((row) => {
     const weekKey = format(startOfWeek(row.date, { weekStartsOn: 1 }), "yyyy-MM-dd");
     const monthKey = format(row.date, "yyyy-MM");
     weeklyRevenueMap.set(weekKey, (weeklyRevenueMap.get(weekKey) ?? 0) + toNumber(row.revenue));
@@ -493,22 +483,22 @@ export async function getDashboardData() {
     };
   });
 
-  const overallExpected = eventTotals._sum.expected_attendees ?? 0;
-  const overallActual = eventTotals._sum.attendance_count ?? 0;
+  const overallExpected = eventTotals.expected_attendees;
+  const overallActual = eventTotals.attendance_count;
 
   return {
     stats: [
       {
         key: "events",
         label: "Total Events",
-        value: eventTotals._count.id ?? 0,
+        value: eventTotals.events,
         change: eventChange,
         trend: toTrend(eventChange),
       },
       {
         key: "tickets",
         label: "Tickets Sold",
-        value: eventTotals._sum.tickets_sold ?? 0,
+        value: eventTotals.tickets_sold,
         change: ticketChange,
         trend: toTrend(ticketChange),
       },
@@ -522,7 +512,7 @@ export async function getDashboardData() {
       {
         key: "revenue",
         label: "Revenue",
-        value: toNumber(eventTotals._sum.revenue),
+        value: eventTotals.revenue,
         change: revenueChange,
         trend: toTrend(revenueChange),
       },
@@ -555,7 +545,11 @@ export async function getDashboardData() {
 }
 
 export async function getEvents() {
+  const context = await requireAuthContext();
   const events = await prisma.event.findMany({
+    where: {
+      workspace_id: context.workspaceId,
+    },
     include: {
       venue: {
         select: {
@@ -571,6 +565,7 @@ export async function getEvents() {
 }
 
 export async function getCalendarEvents() {
+  const context = await requireAuthContext();
   const events = await prisma.event.findMany({
     include: {
       venue: {
@@ -581,6 +576,7 @@ export async function getCalendarEvents() {
       },
     },
     where: {
+      workspace_id: context.workspaceId,
       date: {
         gte: startOfDay(subMonths(new Date(), 1)),
         lte: endOfDay(addMonths(new Date(), 2)),
@@ -593,8 +589,12 @@ export async function getCalendarEvents() {
 }
 
 export async function getEventById(eventId: string) {
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
+  const context = await requireAuthContext();
+  const event = await prisma.event.findFirst({
+    where: {
+      id: eventId,
+      workspace_id: context.workspaceId,
+    },
     include: {
       venue: {
         select: {
@@ -611,6 +611,7 @@ export async function getEventById(eventId: string) {
   const historicalRows = await prisma.event.findMany({
     where: {
       id: { not: event.id },
+      workspace_id: context.workspaceId,
       status: { not: "cancelled" },
       end_time: { lt: new Date() },
     },
@@ -693,23 +694,34 @@ function buildPeriodData(
 }
 
 export async function getReportsData() {
-  const events = await prisma.event.findMany({
-    include: {
-      venue: {
-        select: {
-          id: true,
-          name: true,
+  const context = await requireAuthContext();
+  const [events, dailyAggregateRows] = await Promise.all([
+    prisma.event.findMany({
+      where: {
+        workspace_id: context.workspaceId,
+      },
+      include: {
+        venue: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-    orderBy: [{ date: "desc" }, { start_time: "desc" }],
-  });
+      orderBy: [{ date: "desc" }, { start_time: "desc" }],
+    }),
+    getWorkspaceDailyAggregates({
+      workspaceId: context.workspaceId,
+      from: startOfDay(subMonths(new Date(), 6)),
+      to: endOfDay(new Date()),
+    }),
+  ]);
 
   const tableRows = events.map((event) => mapEventRecord(event));
-  const periodRows = events.map((event) => ({
-    date: event.date,
-    tickets_sold: event.tickets_sold,
-    revenue: event.revenue,
+  const periodRows = dailyAggregateRows.map((row) => ({
+    date: row.date,
+    tickets_sold: row.tickets_sold,
+    revenue: row.revenue,
   }));
 
   const weeklySales = buildPeriodData(periodRows, "week");
@@ -769,7 +781,11 @@ export async function getReportsData() {
 }
 
 export async function getVenues() {
+  const context = await requireAuthContext();
   return prisma.venue.findMany({
+    where: {
+      workspace_id: context.workspaceId,
+    },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -777,4 +793,33 @@ export async function getVenues() {
       capacity: true,
     },
   });
+}
+
+export async function getPreferredVenueForNewEvent() {
+  const context = await requireAuthContext();
+  const latestEventWithVenue = await prisma.event.findFirst({
+    where: {
+      workspace_id: context.workspaceId,
+      venue_id: {
+        not: null,
+      },
+    },
+    orderBy: {
+      created_at: "desc",
+    },
+    include: {
+      venue: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  if (!latestEventWithVenue?.venue) {
+    return null;
+  }
+
+  return latestEventWithVenue.venue;
 }

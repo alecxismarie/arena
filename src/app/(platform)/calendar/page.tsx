@@ -29,7 +29,7 @@ export default async function CalendarPage() {
         </div>
         <Link
           href="/events/new"
-          className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+          className="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
         >
           Create event
         </Link>
@@ -92,13 +92,13 @@ export default async function CalendarPage() {
                 <div className="flex flex-wrap gap-2">
                   <Link
                     href={`/events/${event.id}`}
-                    className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium hover:bg-muted"
+                    className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
                   >
                     Details
                   </Link>
                   <Link
                     href={`/events/${event.id}/edit`}
-                    className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium hover:bg-muted"
+                    className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
                   >
                     Edit
                   </Link>
@@ -106,7 +106,7 @@ export default async function CalendarPage() {
                     <input type="hidden" name="event_id" value={event.id} />
                     <button
                       type="submit"
-                      className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-100"
+                      className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
                     >
                       Cancel
                     </button>
@@ -125,7 +125,7 @@ export default async function CalendarPage() {
                 />
                 <button
                   type="submit"
-                  className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-medium hover:bg-muted"
+                  className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
                 >
                   Reschedule
                 </button>

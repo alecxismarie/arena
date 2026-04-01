@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandSelect } from "@/components/ui/brand-select";
 import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
 import { ArrowDownAZ, ArrowUpZA } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -14,7 +15,7 @@ type EventSummaryRow = {
   actual_attendees: number;
   attendance_variance: number;
   attendance_rate: number;
-  revenue: number;
+  revenue?: number;
 };
 
 type SortKey =
@@ -28,7 +29,7 @@ type SortKey =
   | "rate"
   | "revenue";
 
-const sortOptions: Array<{ key: SortKey; label: string }> = [
+const baseSortOptions: Array<{ key: SortKey; label: string }> = [
   { key: "name", label: "Name" },
   { key: "date", label: "Date" },
   { key: "status", label: "Status" },
@@ -59,16 +60,18 @@ function compareRows(a: EventSummaryRow, b: EventSummaryRow, key: SortKey) {
     case "rate":
       return a.attendance_rate - b.attendance_rate;
     case "revenue":
-      return a.revenue - b.revenue;
+      return (a.revenue ?? 0) - (b.revenue ?? 0);
   }
 }
 
 export function ReportTable({
   rows,
+  showRevenue = true,
   currency,
   timezone,
 }: {
   rows: EventSummaryRow[];
+  showRevenue?: boolean;
   currency?: string;
   timezone?: string;
 }) {
@@ -84,6 +87,17 @@ export function ReportTable({
     return cloned;
   }, [direction, rows, sortBy]);
 
+  const sortOptions = useMemo(
+    () =>
+      baseSortOptions
+        .filter((option) => showRevenue || option.key !== "revenue")
+        .map((option) => ({
+          value: option.key,
+          label: `Sort by ${option.label}`,
+        })),
+    [showRevenue],
+  );
+
   return (
     <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.7)]">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -92,19 +106,15 @@ export function ReportTable({
           <p className="text-sm text-muted-foreground">Sortable performance view across events.</p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+          <BrandSelect
+            name="report_sort_by"
             value={sortBy}
-            onChange={(event) => setSortBy(event.target.value as SortKey)}
-          >
-            {sortOptions.map((option) => (
-              <option key={option.key} value={option.key}>
-                Sort by {option.label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => setSortBy(value as SortKey)}
+            options={sortOptions}
+            className="min-w-[170px] text-sm"
+          />
           <button
-            className="inline-flex items-center gap-1 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+            className="btn-secondary inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium"
             onClick={() => setDirection((current) => (current === "asc" ? "desc" : "asc"))}
             type="button"
           >
@@ -135,7 +145,7 @@ export function ReportTable({
               <th className="px-3 py-2">Actual</th>
               <th className="px-3 py-2">Variance</th>
               <th className="px-3 py-2">Rate</th>
-              <th className="px-3 py-2">Revenue</th>
+              {showRevenue ? <th className="px-3 py-2">Revenue</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -155,9 +165,11 @@ export function ReportTable({
                 <td className="px-3 py-3">{formatNumber(row.actual_attendees)}</td>
                 <td className="px-3 py-3">{formatNumber(row.attendance_variance)}</td>
                 <td className="px-3 py-3">{(row.attendance_rate * 100).toFixed(1)}%</td>
-                <td className="rounded-r-xl px-3 py-3 font-semibold">
-                  {formatCurrency(row.revenue, currency)}
-                </td>
+                {showRevenue ? (
+                  <td className="rounded-r-xl px-3 py-3 font-semibold">
+                    {formatCurrency(row.revenue ?? 0, currency)}
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>

@@ -20,7 +20,45 @@ import {
   YAxis,
 } from "recharts";
 
-const palette = ["#2563eb", "#06b6d4", "#14b8a6", "#0ea5e9", "#60a5fa", "#22d3ee"];
+const brandPalette = [
+  "#e89a17",
+  "#d88914",
+  "#c67712",
+  "#ad6b2a",
+  "#8e6b4e",
+  "#6f594a",
+];
+const chartGridStroke = "rgba(127, 102, 83, 0.16)";
+const chartTooltipStyle = {
+  borderRadius: "0.75rem",
+  borderColor: "#cdb9a8",
+  boxShadow: "0 10px 28px -20px rgba(84,45,14,0.45)",
+};
+
+function TicketDistributionLegend({
+  payload,
+}: {
+  payload?: Array<{ color?: string; value?: string }>;
+}) {
+  if (!payload?.length) return null;
+
+  return (
+    <ul className="mt-3 flex list-none flex-wrap items-center justify-center gap-x-4 gap-y-2 px-2 text-sm text-muted-foreground">
+      {payload.map((entry) => (
+        <li
+          key={`${entry.value}-${entry.color}`}
+          className="inline-flex items-center gap-1.5"
+        >
+          <span
+            className="h-2.5 w-2.5 rounded-[2px]"
+            style={{ backgroundColor: entry.color ?? "var(--color-muted-foreground)" }}
+          />
+          <span>{entry.value}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function valueFormatter(
   value: number,
@@ -51,16 +89,16 @@ export function RevenueTrendChart({
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <div className="inline-flex rounded-xl border border-border bg-muted/50 p-1">
+        <div className="inline-flex gap-1 rounded-xl border border-border bg-muted/50 p-1">
           <button
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${mode === "weekly" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${mode === "weekly" ? "btn-primary shadow-sm" : "btn-secondary"}`}
             onClick={() => setMode("weekly")}
             type="button"
           >
             Weekly
           </button>
           <button
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${mode === "monthly" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium ${mode === "monthly" ? "btn-primary shadow-sm" : "btn-secondary"}`}
             onClick={() => setMode("monthly")}
             type="button"
           >
@@ -74,11 +112,11 @@ export function RevenueTrendChart({
           <LineChart data={data}>
             <defs>
               <linearGradient id="revenue-stroke" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#2563eb" />
-                <stop offset="100%" stopColor="#06b6d4" />
+                <stop offset="0%" stopColor="#e89a17" />
+                <stop offset="100%" stopColor="#b26f1c" />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#94a3b81f" />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
             <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
             <YAxis
               tickFormatter={(value) => formatCurrency(Math.round(Number(value)), currency)}
@@ -90,11 +128,7 @@ export function RevenueTrendChart({
               formatter={(value) =>
                 valueFormatter(numericValue(value), "currency", currency)
               }
-              contentStyle={{
-                borderRadius: "0.75rem",
-                borderColor: "#cbd5e1",
-                boxShadow: "0 10px 28px -20px rgba(15,23,42,0.8)",
-              }}
+              contentStyle={chartTooltipStyle}
             />
             <Line
               type="monotone"
@@ -120,18 +154,14 @@ export function AttendanceByEventChart({
     <div className="h-72">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#94a3b81f" />
+          <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
           <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
           <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
           <Tooltip
             formatter={(value) => valueFormatter(numericValue(value), "number")}
-            contentStyle={{
-              borderRadius: "0.75rem",
-              borderColor: "#cbd5e1",
-              boxShadow: "0 10px 28px -20px rgba(15,23,42,0.8)",
-            }}
+            contentStyle={chartTooltipStyle}
           />
-          <Bar dataKey="attendance" radius={[8, 8, 0, 0]} fill="#2563eb" maxBarSize={42} />
+          <Bar dataKey="attendance" radius={[8, 8, 0, 0]} fill="#cf8312" maxBarSize={42} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -145,22 +175,18 @@ export function SalesTrendChart({ data }: { data: Array<{ label: string; tickets
         <AreaChart data={data}>
           <defs>
             <linearGradient id="sales-area" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.35} />
-              <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.02} />
+              <stop offset="5%" stopColor="#e89a17" stopOpacity={0.35} />
+              <stop offset="95%" stopColor="#e89a17" stopOpacity={0.02} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#94a3b81f" />
+          <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
           <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
           <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
           <Tooltip
             formatter={(value) => valueFormatter(numericValue(value), "number")}
-            contentStyle={{
-              borderRadius: "0.75rem",
-              borderColor: "#cbd5e1",
-              boxShadow: "0 10px 28px -20px rgba(15,23,42,0.8)",
-            }}
+            contentStyle={chartTooltipStyle}
           />
-          <Area type="monotone" dataKey="tickets" stroke="#06b6d4" fill="url(#sales-area)" />
+          <Area type="monotone" dataKey="tickets" stroke="#cf8312" fill="url(#sales-area)" />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -176,7 +202,7 @@ export function TicketDistributionChart({
     () =>
       data.map((item, index) => ({
         ...item,
-        fill: palette[index % palette.length],
+        fill: brandPalette[index % brandPalette.length],
       })),
     [data],
   );
@@ -187,13 +213,14 @@ export function TicketDistributionChart({
         <PieChart>
           <Tooltip
             formatter={(value) => valueFormatter(numericValue(value), "number")}
-            contentStyle={{
-              borderRadius: "0.75rem",
-              borderColor: "#cbd5e1",
-              boxShadow: "0 10px 28px -20px rgba(15,23,42,0.8)",
-            }}
+            contentStyle={chartTooltipStyle}
           />
-          <Legend />
+          <Legend
+            align="center"
+            verticalAlign="bottom"
+            height={84}
+            content={<TicketDistributionLegend />}
+          />
           <Pie
             data={pieData}
             dataKey="tickets"
@@ -224,7 +251,7 @@ export function EventSalesMiniChart({
     <div className="h-52">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#94a3b81f" />
+          <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
           <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
           <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
           <Tooltip
@@ -233,14 +260,10 @@ export function EventSalesMiniChart({
                 ? valueFormatter(numericValue(value), "currency", currency)
                 : valueFormatter(numericValue(value), "number")
             }
-            contentStyle={{
-              borderRadius: "0.75rem",
-              borderColor: "#cbd5e1",
-              boxShadow: "0 10px 28px -20px rgba(15,23,42,0.8)",
-            }}
+            contentStyle={chartTooltipStyle}
           />
-          <Line type="monotone" dataKey="tickets" stroke="#2563eb" strokeWidth={2.5} dot={false} />
-          <Line type="monotone" dataKey="revenue" stroke="#14b8a6" strokeWidth={2.5} dot={false} />
+          <Line type="monotone" dataKey="tickets" stroke="#cf8312" strokeWidth={2.5} dot={false} />
+          <Line type="monotone" dataKey="revenue" stroke="#7f6653" strokeWidth={2.5} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -264,18 +287,14 @@ export function ReportBarChart({
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#94a3b81f" />
+          <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
           <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
           <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
           <Tooltip
             formatter={(value) =>
               valueFormatter(numericValue(value), formatMode, currency)
             }
-            contentStyle={{
-              borderRadius: "0.75rem",
-              borderColor: "#cbd5e1",
-              boxShadow: "0 10px 28px -20px rgba(15,23,42,0.8)",
-            }}
+            contentStyle={chartTooltipStyle}
           />
           <Bar dataKey={valueKey} radius={[8, 8, 0, 0]} fill={color} maxBarSize={44} />
         </BarChart>

@@ -30,16 +30,17 @@ model User {
 }
 
 model Workspace {
-  id          String                @id @default(cuid())
-  name        String
-  timezone    String                @default("UTC")
-  currency    String                @default("USD")
-  created_at  DateTime              @default(now())
-  updated_at  DateTime              @updatedAt
-  venues      Venue[]
-  events      Event[]
-  memberships WorkspaceMembership[]
-  sessions    Session[]
+  id               String                   @id @default(cuid())
+  name             String
+  timezone         String                   @default("UTC")
+  currency         String                   @default("USD")
+  created_at       DateTime                 @default(now())
+  updated_at       DateTime                 @updatedAt
+  venues           Venue[]
+  events           Event[]
+  memberships      WorkspaceMembership[]
+  sessions         Session[]
+  daily_aggregates WorkspaceDailyAggregate[]
 }
 
 model Venue {
@@ -80,8 +81,28 @@ model Event {
   attendance_logs    AttendanceLog[]
 
   @@index([workspace_id])
+  @@index([workspace_id, date])
+  @@index([workspace_id, status, date])
+  @@index([workspace_id, created_at])
   @@index([date])
   @@index([status])
+}
+
+model WorkspaceDailyAggregate {
+  id                 String    @id @default(cuid())
+  workspace_id       String
+  date               DateTime
+  event_count        Int       @default(0)
+  expected_attendees Int       @default(0)
+  tickets_sold       Int       @default(0)
+  attendance_count   Int       @default(0)
+  revenue            Decimal   @default(0) @db.Decimal(12, 2)
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+  workspace          Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+
+  @@unique([workspace_id, date])
+  @@index([workspace_id, date])
 }
 
 model WorkspaceMembership {

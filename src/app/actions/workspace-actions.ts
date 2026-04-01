@@ -1,5 +1,12 @@
 "use server";
 
+import { Prisma, WorkspaceRole } from "@prisma/client";
+import { assertOwner } from "@/lib/access-control";
+import {
+  requireAuthContext,
+  requireIdentityContext,
+  startWorkspaceSession,
+} from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   WORKSPACE_DEFAULT_CURRENCY,
@@ -21,6 +28,67 @@ function parseWorkspaceName(value: FormDataEntryValue | null) {
   return name;
 }
 
+function parseAccountName(value: FormDataEntryValue | null) {
+  const name = String(value ?? "").trim();
+  if (!name) {
+    throw new Error("Name is required");
+  }
+  if (name.length > 80) {
+    throw new Error("Name must be 80 characters or less");
+  }
+  return name;
+}
+
+function parseWorkspaceRole(value: FormDataEntryValue | null): WorkspaceRole {
+  const role = String(value ?? "").trim().toLowerCase();
+  if (role !== "owner" && role !== "editor") {
+    throw new Error("Role must be owner or editor");
+  }
+  return role;
+}
+
+function parseEmail(value: FormDataEntryValue | null) {
+  const email = String(value ?? "").trim().toLowerCase();
+  if (!email) {
+    throw new Error("Email is required");
+  }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(email)) {
+    throw new Error("A valid email is required");
+  }
+
+  if (email.length > 254) {
+    throw new Error("Email is too long");
+  }
+
+  return email;
+}
+
+function parseMemberUserId(value: FormDataEntryValue | null) {
+  const userId = String(value ?? "").trim();
+  if (!userId) {
+    throw new Error("Member is required");
+  }
+  return userId;
+}
+
+async function assertOwnerCountAfterDemotion(params: {
+  tx: Prisma.TransactionClient;
+  workspaceId: string;
+}) {
+  const ownerCount = await params.tx.workspaceMembership.count({
+    where: {
+      workspace_id: params.workspaceId,
+      role: "owner",
+    },
+  });
+
+  if (ownerCount <= 1) {
+    throw new Error("At least one owner must remain in the workspace");
+  }
+}
+
 function parseTimezone(value: FormDataEntryValue | null) {
   const timezone = String(value ?? "").trim();
   if (!timezone) return WORKSPACE_DEFAULT_TIMEZONE;
@@ -40,25 +108,48 @@ function parseCurrency(value: FormDataEntryValue | null) {
 }
 
 export async function createWorkspaceAction(formData: FormData) {
-  const existing = await prisma.workspace.findFirst({
-    select: { id: true },
+  const identity = await requireIdentityContext();
+
+  const existingMembership = await prisma.workspaceMembership.findFirst({
+    where: { user_id: identity.userId },
     orderBy: { created_at: "asc" },
+    select: { workspace_id: true },
   });
 
-  if (existing) {
+  if (existingMembership) {
+    await startWorkspaceSession({
+      userId: identity.userId,
+      workspaceId: existingMembership.workspace_id,
+    });
     redirect("/dashboard");
   }
 
   const name = parseWorkspaceName(formData.get("name"));
-  const timezone = parseTimezone(formData.get("timezone"));
-  const currency = parseCurrency(formData.get("currency"));
 
-  await prisma.workspace.create({
-    data: {
-      name,
-      timezone,
-      currency,
-    },
+  const workspace = await prisma.$transaction(async (tx) => {
+    const createdWorkspace = await tx.workspace.create({
+      data: {
+        name,
+        timezone: WORKSPACE_DEFAULT_TIMEZONE,
+        currency: WORKSPACE_DEFAULT_CURRENCY,
+      },
+      select: { id: true },
+    });
+
+    await tx.workspaceMembership.create({
+      data: {
+        workspace_id: createdWorkspace.id,
+        user_id: identity.userId,
+        role: "owner",
+      },
+    });
+
+    return createdWorkspace;
+  });
+
+  await startWorkspaceSession({
+    userId: identity.userId,
+    workspaceId: workspace.id,
   });
 
   revalidatePath("/");
@@ -68,22 +159,232 @@ export async function createWorkspaceAction(formData: FormData) {
 }
 
 export async function updateWorkspaceAction(formData: FormData) {
-  const workspaceId = String(formData.get("workspace_id") ?? "");
-  if (!workspaceId) {
-    throw new Error("Workspace id is required");
-  }
+  const context = await requireAuthContext();
+  assertOwner(context);
 
   const name = parseWorkspaceName(formData.get("name"));
   const timezone = parseTimezone(formData.get("timezone"));
   const currency = parseCurrency(formData.get("currency"));
 
   await prisma.workspace.update({
-    where: { id: workspaceId },
+    where: { id: context.workspaceId },
     data: {
       name,
       timezone,
       currency,
     },
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/settings");
+}
+
+export async function updateAccountAction(formData: FormData) {
+  const context = await requireAuthContext();
+  assertOwner(context);
+
+  const name = parseAccountName(formData.get("name"));
+  const role = parseWorkspaceRole(formData.get("role"));
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: context.userId },
+      data: { name },
+    });
+
+    if (role !== context.role) {
+      if (context.role === "owner" && role === "editor") {
+        const ownerCount = await tx.workspaceMembership.count({
+          where: {
+            workspace_id: context.workspaceId,
+            role: "owner",
+          },
+        });
+
+        if (ownerCount <= 1) {
+          throw new Error("At least one owner must remain in the workspace");
+        }
+      }
+
+      await tx.workspaceMembership.update({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: context.workspaceId,
+            user_id: context.userId,
+          },
+        },
+        data: { role },
+      });
+    }
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/settings");
+}
+
+export async function addTeamMemberAction(formData: FormData) {
+  const context = await requireAuthContext();
+  assertOwner(context);
+
+  const name = parseAccountName(formData.get("name"));
+  const email = parseEmail(formData.get("email"));
+  const role = parseWorkspaceRole(formData.get("role"));
+
+  await prisma.$transaction(async (tx) => {
+    const user = await tx.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        email,
+        name,
+      },
+      select: { id: true },
+    });
+
+    const existingMembership = await tx.workspaceMembership.findUnique({
+      where: {
+        workspace_id_user_id: {
+          workspace_id: context.workspaceId,
+          user_id: user.id,
+        },
+      },
+      select: {
+        role: true,
+      },
+    });
+
+    if (!existingMembership) {
+      await tx.workspaceMembership.create({
+        data: {
+          workspace_id: context.workspaceId,
+          user_id: user.id,
+          role,
+        },
+      });
+      return;
+    }
+
+    if (existingMembership.role === role) {
+      return;
+    }
+
+    if (existingMembership.role === "owner" && role === "editor") {
+      await assertOwnerCountAfterDemotion({
+        tx,
+        workspaceId: context.workspaceId,
+      });
+    }
+
+    await tx.workspaceMembership.update({
+      where: {
+        workspace_id_user_id: {
+          workspace_id: context.workspaceId,
+          user_id: user.id,
+        },
+      },
+      data: {
+        role,
+      },
+    });
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/settings");
+}
+
+export async function updateTeamMemberRoleAction(formData: FormData) {
+  const context = await requireAuthContext();
+  assertOwner(context);
+
+  const memberUserId = parseMemberUserId(formData.get("user_id"));
+  const role = parseWorkspaceRole(formData.get("role"));
+
+  await prisma.$transaction(async (tx) => {
+    const membership = await tx.workspaceMembership.findUnique({
+      where: {
+        workspace_id_user_id: {
+          workspace_id: context.workspaceId,
+          user_id: memberUserId,
+        },
+      },
+      select: {
+        role: true,
+      },
+    });
+
+    if (!membership) {
+      throw new Error("Team member not found");
+    }
+
+    if (membership.role === role) {
+      return;
+    }
+
+    if (membership.role === "owner" && role === "editor") {
+      await assertOwnerCountAfterDemotion({
+        tx,
+        workspaceId: context.workspaceId,
+      });
+    }
+
+    await tx.workspaceMembership.update({
+      where: {
+        workspace_id_user_id: {
+          workspace_id: context.workspaceId,
+          user_id: memberUserId,
+        },
+      },
+      data: {
+        role,
+      },
+    });
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/settings");
+}
+
+export async function removeTeamMemberAction(formData: FormData) {
+  const context = await requireAuthContext();
+  assertOwner(context);
+
+  const memberUserId = parseMemberUserId(formData.get("user_id"));
+  if (memberUserId === context.userId) {
+    throw new Error("You cannot remove your own membership");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const membership = await tx.workspaceMembership.findUnique({
+      where: {
+        workspace_id_user_id: {
+          workspace_id: context.workspaceId,
+          user_id: memberUserId,
+        },
+      },
+      select: {
+        role: true,
+      },
+    });
+
+    if (!membership) {
+      throw new Error("Team member not found");
+    }
+
+    if (membership.role === "owner") {
+      await assertOwnerCountAfterDemotion({
+        tx,
+        workspaceId: context.workspaceId,
+      });
+    }
+
+    await tx.workspaceMembership.delete({
+      where: {
+        workspace_id_user_id: {
+          workspace_id: context.workspaceId,
+          user_id: memberUserId,
+        },
+      },
+    });
   });
 
   revalidatePath("/dashboard");

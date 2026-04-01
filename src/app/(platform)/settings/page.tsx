@@ -1,28 +1,66 @@
-import { updateWorkspaceAction } from "@/app/actions/workspace-actions";
+import { AccountSettingsForm } from "@/components/settings/account-settings-form";
+import { TeamMembersForm } from "@/components/settings/team-members-form";
+import { WorkspaceSettingsForm } from "@/components/settings/workspace-settings-form";
+import { assertOwner } from "@/lib/access-control";
+import { getAuthContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   WORKSPACE_CURRENCY_OPTIONS,
-  WORKSPACE_DEFAULT_CURRENCY,
-  WORKSPACE_DEFAULT_TIMEZONE,
   WORKSPACE_TIMEZONE_OPTIONS,
   resolveWorkspaceCurrency,
   resolveWorkspaceTimezone,
 } from "@/lib/workspace-options";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [workspace, account] = await Promise.all([
+  const context = await getAuthContext();
+  if (!context) {
+    redirect("/");
+  }
+
+  try {
+    assertOwner(context);
+  } catch {
+    redirect("/dashboard");
+  }
+
+  const [workspace, account, memberships] = await Promise.all([
     getCurrentWorkspace(),
-    prisma.user.findFirst({
+    prisma.user.findUnique({
+      where: {
+        id: context.userId,
+      },
       select: {
         name: true,
         email: true,
-        role: true,
       },
-      orderBy: { created_at: "asc" },
+    }),
+    prisma.workspaceMembership.findMany({
+      where: {
+        workspace_id: context.workspaceId,
+      },
+      orderBy: [
+        {
+          role: "asc",
+        },
+        {
+          created_at: "asc",
+        },
+      ],
+      select: {
+        role: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
     }),
   ]);
   const selectedTimezone = resolveWorkspaceTimezone(workspace?.timezone);
@@ -42,20 +80,11 @@ export default async function SettingsPage() {
       <section className="rounded-3xl border border-border/60 bg-card/90 p-5">
         <h2 className="text-lg font-semibold text-foreground">Account</h2>
         {account ? (
-          <dl className="mt-3 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Name</dt>
-              <dd className="mt-1 text-sm font-medium text-foreground">{account.name}</dd>
-            </div>
-            <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Email</dt>
-              <dd className="mt-1 text-sm font-medium text-foreground">{account.email}</dd>
-            </div>
-            <div className="rounded-2xl border border-border/60 bg-background/70 p-3">
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">Role</dt>
-              <dd className="mt-1 text-sm font-medium capitalize text-foreground">{account.role}</dd>
-            </div>
-          </dl>
+          <AccountSettingsForm
+            defaultName={account.name}
+            email={account.email}
+            defaultRole={context.role}
+          />
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">
             No account record is configured yet.
@@ -74,58 +103,30 @@ export default async function SettingsPage() {
             .
           </p>
         ) : (
-          <form action={updateWorkspaceAction} className="mt-4 space-y-4">
-            <input type="hidden" name="workspace_id" value={workspace.id} />
-
-            <label className="block space-y-1.5 text-sm">
-              <span className="font-medium text-foreground">Workspace name</span>
-              <input
-                name="name"
-                defaultValue={workspace.name}
-                required
-                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
-              />
-            </label>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-foreground">Timezone</span>
-                <select
-                  name="timezone"
-                  defaultValue={selectedTimezone || WORKSPACE_DEFAULT_TIMEZONE}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
-                >
-                  {WORKSPACE_TIMEZONE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-foreground">Currency</span>
-                <select
-                  name="currency"
-                  defaultValue={selectedCurrency || WORKSPACE_DEFAULT_CURRENCY}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 uppercase outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
-                >
-                  {WORKSPACE_CURRENCY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
-            >
-              Save workspace
-            </button>
-          </form>
+          <WorkspaceSettingsForm
+            defaultName={workspace.name}
+            defaultTimezone={selectedTimezone}
+            defaultCurrency={selectedCurrency}
+            timezoneOptions={WORKSPACE_TIMEZONE_OPTIONS}
+            currencyOptions={WORKSPACE_CURRENCY_OPTIONS}
+          />
         )}
+      </section>
+
+      <section className="rounded-3xl border border-border/60 bg-card/90 p-5">
+        <h2 className="text-lg font-semibold text-foreground">Team Members</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Add members, set their role, and remove access when needed.
+        </p>
+        <TeamMembersForm
+          members={memberships.map((membership) => ({
+            userId: membership.user.id,
+            name: membership.user.name,
+            email: membership.user.email,
+            role: membership.role,
+            isCurrentUser: membership.user.id === context.userId,
+          }))}
+        />
       </section>
     </div>
   );

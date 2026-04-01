@@ -1,14 +1,15 @@
 "use client";
 
+import { logoutAction } from "@/app/actions/auth-actions";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
   CalendarDays,
   Cog,
   LayoutDashboard,
-  RadioTower,
   Ticket,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -24,20 +25,23 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_0%_0%,rgba(29,78,216,0.07),transparent_38%),radial-gradient(circle_at_100%_0%,rgba(6,182,212,0.1),transparent_36%),linear-gradient(180deg,var(--color-surface),var(--color-surface-soft))] text-foreground">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_0%_0%,rgba(231,150,21,0.16),transparent_38%),radial-gradient(circle_at_100%_0%,rgba(80,56,39,0.09),transparent_36%),linear-gradient(180deg,var(--color-surface),var(--color-surface-soft))] text-foreground">
       <div className="mx-auto flex min-h-screen w-full max-w-[1680px]">
-        <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-border/70 bg-card/80 px-6 py-8 backdrop-blur-xl lg:block">
-          <div className="mb-10 flex items-center gap-3">
-            <span className="rounded-2xl border border-border bg-accent/10 p-2 text-accent">
-              <RadioTower className="h-5 w-5" />
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Signals</p>
-              <p className="text-xs text-muted-foreground">Event Intelligence</p>
+        <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-border/70 bg-card/80 px-6 py-8 backdrop-blur-xl lg:flex">
+          <div className="mb-10">
+            <div className="relative -ml-1 h-12 w-40 overflow-hidden">
+              <Image
+                src="/signals-logo.png"
+                alt="Signals"
+                fill
+                sizes="160px"
+                priority
+                className="object-cover object-center"
+              />
             </div>
           </div>
 
-          <nav className="space-y-1.5">
+          <nav className="flex-1 space-y-1.5">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active =
@@ -65,10 +69,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
+
+          <form action={logoutAction} className="mt-4">
+            <button
+              type="submit"
+              className="btn-primary w-full rounded-2xl px-3.5 py-2.5 text-sm font-medium"
+            >
+              Log out
+            </button>
+          </form>
         </aside>
 
         <main className="w-full px-4 py-5 sm:px-6 lg:px-10 lg:py-8">
-          <div className="mb-5 flex gap-2 overflow-x-auto pb-2 lg:hidden">
+          <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-2 lg:hidden">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active =
@@ -89,6 +102,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+            <form action={logoutAction} className="ml-1 shrink-0">
+              <button
+                type="submit"
+                className="btn-primary rounded-xl px-3 py-2 text-xs font-medium"
+              >
+                Log out
+              </button>
+            </form>
           </div>
           {children}
         </main>

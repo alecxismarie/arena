@@ -1,102 +1,95 @@
-import { createWorkspaceAction } from "@/app/actions/workspace-actions";
-import {
-  WORKSPACE_CURRENCY_OPTIONS,
-  WORKSPACE_DEFAULT_CURRENCY,
-  WORKSPACE_DEFAULT_TIMEZONE,
-  WORKSPACE_TIMEZONE_OPTIONS,
-} from "@/lib/workspace-options";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { startOnboardingAction } from "@/app/actions/auth-actions";
+import { getAuthContext } from "@/lib/auth";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const workspace = await getCurrentWorkspace();
-  if (workspace) {
+  const authContext = await getAuthContext();
+
+  if (authContext) {
     redirect("/dashboard");
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-5 py-10 sm:px-8">
-      <section className="grid w-full gap-6 rounded-3xl border border-border/70 bg-card/90 p-6 shadow-[0_10px_32px_-24px_rgba(15,23,42,0.7)] lg:grid-cols-2 lg:p-8">
-        <div className="space-y-4">
-          <p className="text-sm font-semibold uppercase tracking-wide text-accent">Signals</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            Understand how your events actually perform.
-          </h1>
-          <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
-            Track turnout, compare expected vs actual, and surface insights from
-            past events.
-          </p>
-          <div className="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm text-muted-foreground">
-            Authentication is not configured in this environment yet.
-          </div>
-        </div>
+    <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(231,150,21,0.24),transparent_28%),radial-gradient(circle_at_90%_82%,rgba(79,57,42,0.14),transparent_32%),linear-gradient(180deg,#f3e8e8_0%,#f5e7df_52%,#f3e8e8_100%)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-[12%] top-[18%] h-72 w-72 rounded-full bg-amber-400/25 blur-[120px]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-[9%] top-[16%] h-80 w-80 rounded-full bg-orange-500/15 blur-[140px]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.1] [background-image:linear-gradient(rgba(112,78,52,0.52)_1px,transparent_1px),linear-gradient(90deg,rgba(112,78,52,0.52)_1px,transparent_1px)] [background-size:34px_34px]"
+      />
 
-        <div className="rounded-2xl border border-border/70 bg-background/70 p-5">
-          <h2 className="text-lg font-semibold text-foreground">Create workspace</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Set up your workspace to enter the product.
-          </p>
-
-          <form action={createWorkspaceAction} className="mt-4 space-y-4">
-            <label className="block space-y-1.5 text-sm">
-              <span className="font-medium text-foreground">Workspace name</span>
-              <input
-                name="name"
-                placeholder="Signals Operations"
-                required
-                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+      <section className="relative mx-auto flex min-h-screen w-full max-w-6xl items-center px-5 py-10 sm:px-8">
+        <div className="grid w-full gap-6 rounded-[2rem] border border-border/80 bg-surface/92 p-6 shadow-[0_30px_80px_-50px_rgba(84,45,14,0.35)] backdrop-blur-xl lg:grid-cols-[1.15fr_0.85fr] lg:p-8">
+          <div className="space-y-5 rounded-3xl border border-border/70 bg-surface/90 p-5 sm:p-6">
+            <div className="relative -ml-1 h-14 w-44 overflow-hidden">
+              <Image
+                src="/signals-logo.png"
+                alt="Signals"
+                fill
+                sizes="176px"
+                priority
+                className="object-cover object-center"
               />
-            </label>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-foreground">Timezone</span>
-                <select
-                  name="timezone"
-                  defaultValue={WORKSPACE_DEFAULT_TIMEZONE}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
-                >
-                  {WORKSPACE_TIMEZONE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-foreground">Currency</span>
-                <select
-                  name="currency"
-                  defaultValue={WORKSPACE_DEFAULT_CURRENCY}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 uppercase outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
-                >
-                  {WORKSPACE_CURRENCY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
+            <h1 className="max-w-[18ch] text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
+              Understand how your events actually perform.
+            </h1>
+            <p className="max-w-xl text-sm text-muted-foreground sm:text-lg">
+              Track turnout, compare expected vs actual, and surface operational
+              insights from past events.
+            </p>
+          </div>
 
-            <button
-              type="submit"
-              className="w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
-            >
-              Create workspace
-            </button>
+          <div className="self-start rounded-3xl border border-border/70 bg-surface/90 p-5 sm:p-6">
+            <h2 className="text-xl font-semibold text-foreground">Get started</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Use your work email and workspace name to continue.
+            </p>
 
-            <button
-              type="button"
-              disabled
-              className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-medium text-muted-foreground"
-            >
-              Log in
-            </button>
-          </form>
+            <form action={startOnboardingAction} className="mt-5 space-y-4">
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-medium text-foreground">Email</span>
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                  required
+                  className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
+                />
+              </label>
+
+              <label className="block space-y-1.5 text-sm">
+                <span className="font-medium text-foreground">Workspace name</span>
+                <input
+                  name="workspace_name"
+                  placeholder="Enter workspace name"
+                  required
+                  className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
+                />
+              </label>
+
+              <button
+                type="submit"
+                className="btn-primary w-full rounded-xl px-4 py-2.5 text-sm font-semibold"
+              >
+                Continue
+              </button>
+            </form>
+          </div>
         </div>
       </section>
     </main>

@@ -3,15 +3,17 @@ import {
   rescheduleEventAction,
 } from "@/app/actions/event-actions";
 import { EventSalesMiniChart } from "@/components/charts/dashboard-charts";
+import { SalesTrendChart } from "@/components/charts/dashboard-charts";
 import { ChartCard } from "@/components/ui/chart-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { getEventById } from "@/lib/analytics";
+import { getAuthContext } from "@/lib/auth";
 import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { format } from "date-fns";
 import { Edit3 } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,12 @@ export default async function EventDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const context = await getAuthContext();
+  if (!context) {
+    redirect("/");
+  }
+  const canViewFinancial = context.role === "owner";
+
   const { id } = await params;
   const [payload, workspace] = await Promise.all([
     getEventById(id),
@@ -51,7 +59,7 @@ export default async function EventDetailPage({
               {event.description ?? "View how this event performed."}
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Venue: {event.venue?.name ?? "Signals Venue"} -{" "}
+              Venue: {event.venue?.name ?? "No venue selected"} -{" "}
               {formatInTimezone(event.start_time, workspace?.timezone, {
                 hour: "numeric",
                 minute: "2-digit",
@@ -68,7 +76,7 @@ export default async function EventDetailPage({
             <StatusPill status={event.status} />
             <Link
               href={`/events/${event.id}/edit`}
-              className="inline-flex items-center gap-1 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+              className="btn-secondary inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium"
             >
               <Edit3 className="h-3.5 w-3.5" />
               Edit event
@@ -77,13 +85,15 @@ export default async function EventDetailPage({
         </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Revenue</p>
-          <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatCurrency(event.revenue, workspace?.currency)}
-          </p>
-        </article>
+      <section className={`grid gap-4 md:grid-cols-2 ${canViewFinancial ? "xl:grid-cols-3" : "xl:grid-cols-2"}`}>
+        {canViewFinancial ? (
+          <article className="rounded-2xl border border-border/60 bg-card p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Revenue</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">
+              {formatCurrency(event.revenue, workspace?.currency)}
+            </p>
+          </article>
+        ) : null}
         <article className="rounded-2xl border border-border/60 bg-card p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Tickets Sold</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
@@ -237,12 +247,26 @@ export default async function EventDetailPage({
         </div>
       </section>
 
-      <ChartCard
-        title="Event Performance"
-        subtitle="Current tickets sold and revenue"
-      >
-        <EventSalesMiniChart data={salesTrend} currency={workspace?.currency} />
-      </ChartCard>
+      {canViewFinancial ? (
+        <ChartCard
+          title="Event Performance"
+          subtitle="Current tickets sold and revenue"
+        >
+          <EventSalesMiniChart data={salesTrend} currency={workspace?.currency} />
+        </ChartCard>
+      ) : (
+        <ChartCard
+          title="Event Performance"
+          subtitle="Current tickets sold trend"
+        >
+          <SalesTrendChart
+            data={salesTrend.map((point) => ({
+              label: point.label,
+              tickets: point.tickets,
+            }))}
+          />
+        </ChartCard>
+      )}
 
       <section className="grid gap-4 rounded-3xl border border-border/60 bg-card/90 p-5 md:grid-cols-2">
         <form action={rescheduleEventAction} className="space-y-2 rounded-2xl border border-border/60 bg-background/70 p-4">
@@ -258,21 +282,21 @@ export default async function EventDetailPage({
           />
           <button
             type="submit"
-            className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-muted"
+            className="btn-secondary rounded-xl px-3 py-2 text-sm font-medium"
           >
             Reschedule
           </button>
         </form>
 
-        <form action={cancelEventAction} className="space-y-2 rounded-2xl border border-rose-200/80 bg-rose-50/70 p-4">
-          <h2 className="text-base font-semibold text-rose-700">Cancel Event</h2>
-          <p className="text-sm text-rose-700/80">
+        <form action={cancelEventAction} className="space-y-2 rounded-2xl border border-border/70 bg-surface/90 p-4">
+          <h2 className="text-base font-semibold text-foreground">Cancel Event</h2>
+          <p className="text-sm text-muted-foreground">
             Mark this event as cancelled. It stays in historical reporting.
           </p>
           <input type="hidden" name="event_id" value={event.id} />
           <button
             type="submit"
-            className="rounded-xl border border-rose-300 bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-200"
+            className="btn-secondary rounded-xl px-3 py-2 text-sm font-medium"
           >
             Cancel event
           </button>

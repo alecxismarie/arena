@@ -48,10 +48,10 @@ DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/arena_db?schema=public"
 npm run db:generate
 ```
 
-3. Push schema:
+3. Apply migrations (recommended):
 
 ```bash
-npm run db:push
+npm run db:migrate:deploy
 ```
 
 4. Seed data:
@@ -65,6 +65,31 @@ npm run db:seed
 ```bash
 npm run dev
 ```
+
+## Migration Baseline Strategy
+
+Signals now includes an idempotent baseline migration (`20260330_step0_baseline_bootstrap`) so fresh databases can apply migrations cleanly.
+
+Use these flows:
+
+1. New empty database:
+
+```bash
+npm run db:migrate:deploy
+```
+
+2. Existing non-empty database without Prisma migration history (one-time baseline):
+
+```bash
+npm run db:migrate:baseline
+npm run db:migrate:deploy
+```
+
+## Branch Protection
+
+Before live deployment, configure required branch protection checks in GitHub:
+
+- [Branch protection checklist](./docs/branch-protection-checklist.md)
 
 ## App Routes
 
