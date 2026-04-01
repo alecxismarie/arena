@@ -16,15 +16,23 @@ export default async function HomePage() {
     <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(231,150,21,0.24),transparent_28%),radial-gradient(circle_at_90%_82%,rgba(79,57,42,0.14),transparent_32%),linear-gradient(180deg,#f3e8e8_0%,#f5e7df_52%,#f3e8e8_100%)]"
+        className="ambient-onboarding-bg pointer-events-none absolute inset-0"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute left-[12%] top-[18%] h-72 w-72 rounded-full bg-amber-400/25 blur-[120px]"
+        className="ambient-yellow-drift pointer-events-none absolute left-[-30vw] top-[-20vh] h-[86vh] w-[86vh] max-h-[900px] max-w-[900px] rounded-full"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute right-[9%] top-[16%] h-80 w-80 rounded-full bg-orange-500/15 blur-[140px]"
+        className="ambient-yellow-drift ambient-yellow-drift-secondary pointer-events-none absolute right-[-30vw] top-[32%] h-[78vh] w-[78vh] max-h-[840px] max-w-[840px] rounded-full"
+      />
+      <div
+        aria-hidden
+        className="ambient-blob ambient-blob-warm pointer-events-none absolute left-[12%] top-[18%] h-72 w-72 rounded-full bg-amber-400/25 blur-[120px]"
+      />
+      <div
+        aria-hidden
+        className="ambient-blob ambient-blob-soft pointer-events-none absolute right-[9%] top-[16%] h-80 w-80 rounded-full bg-orange-500/15 blur-[140px]"
       />
       <div
         aria-hidden
@@ -53,7 +61,7 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="self-start rounded-3xl border border-border/70 bg-surface/90 p-5 sm:p-6">
+          <div className="h-full rounded-3xl border border-border/70 bg-surface/90 p-5 sm:p-6">
             <h2 className="text-xl font-semibold text-foreground">Get started</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Use your work email and workspace name to continue.
