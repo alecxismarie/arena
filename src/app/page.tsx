@@ -64,7 +64,7 @@ export default async function HomePage() {
           <div className="h-full rounded-3xl border border-border/70 bg-surface/90 p-5 sm:p-6">
             <h2 className="text-xl font-semibold text-foreground">Get started</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Use your work email and workspace name to continue.
+              Use your work email, workspace name, and password to continue.
             </p>
 
             <OnboardingForm />

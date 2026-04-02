@@ -13,8 +13,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function startOnboardingAction(formData: FormData) {
-  await requestOnboardingVerification(formData);
+  const result = await requestOnboardingVerification(formData);
   revalidatePath("/");
+
+  if ("redirectTo" in result) {
+    revalidatePath("/dashboard");
+    redirect(result.redirectTo);
+  }
+
   redirect("/");
 }
 

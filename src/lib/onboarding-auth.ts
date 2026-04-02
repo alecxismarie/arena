@@ -1,6 +1,12 @@
 import "server-only";
 
-import { createHash, randomBytes } from "crypto";
+import {
+  createHash,
+  randomBytes,
+  scrypt as scryptCallback,
+  timingSafeEqual,
+} from "crypto";
+import { promisify } from "util";
 import { startWorkspaceSession } from "@/lib/auth";
 import { sendVerificationMagicLinkEmail } from "@/lib/brevo";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +18,14 @@ import {
 const TOKEN_TTL_MS = 15 * 60 * 1000;
 const REQUEST_COOLDOWN_MS = 60 * 1000;
 const MAX_ACTIVE_TOKENS_PER_EMAIL = 5;
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 128;
+const PASSWORD_KEY_LENGTH = 64;
+const scrypt = promisify(scryptCallback);
+
+export type StartOnboardingResult =
+  | { verificationSentTo: string }
+  | { redirectTo: "/dashboard" };
 
 function parseEmail(value: FormDataEntryValue | null) {
   const email = String(value ?? "").trim().toLowerCase();
@@ -42,6 +56,23 @@ function parseWorkspaceName(value: FormDataEntryValue | null) {
   return name;
 }
 
+function parsePassword(value: FormDataEntryValue | null) {
+  const password = String(value ?? "");
+  if (!password) {
+    throw new Error("Password is required");
+  }
+
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+  }
+
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    throw new Error(`Password must be ${MAX_PASSWORD_LENGTH} characters or less`);
+  }
+
+  return password;
+}
+
 function deriveNameFromEmail(email: string) {
   const [localPart] = email.split("@");
   const cleaned = localPart.replace(/[._-]+/g, " ").trim();
@@ -58,6 +89,27 @@ function deriveNameFromEmail(email: string) {
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+async function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const derived = (await scrypt(password, salt, PASSWORD_KEY_LENGTH)) as Buffer;
+  return `${salt}:${derived.toString("hex")}`;
+}
+
+async function verifyPassword(password: string, passwordHash: string) {
+  const [salt, hashHex] = passwordHash.split(":");
+  if (!salt || !hashHex) {
+    return false;
+  }
+
+  const expected = Buffer.from(hashHex, "hex");
+  const actual = (await scrypt(password, salt, expected.length)) as Buffer;
+  if (expected.length !== actual.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expected, actual);
 }
 
 function getBaseUrl() {
@@ -88,10 +140,58 @@ async function findWorkspaceForUser(userId: string) {
   return membership?.workspace_id ?? null;
 }
 
-export async function requestOnboardingVerification(formData: FormData) {
+export async function requestOnboardingVerification(
+  formData: FormData,
+): Promise<StartOnboardingResult> {
   const email = parseEmail(formData.get("email"));
   const workspaceName = parseWorkspaceName(formData.get("workspace_name"));
+  const password = parsePassword(formData.get("password"));
   const now = new Date();
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      password_hash: true,
+    },
+  });
+
+  if (existingUser?.password_hash) {
+    const isPasswordValid = await verifyPassword(password, existingUser.password_hash);
+    if (!isPasswordValid) {
+      throw new Error("Invalid email, workspace, or password");
+    }
+
+    const membership = await prisma.workspaceMembership.findFirst({
+      where: {
+        user_id: existingUser.id,
+        workspace: {
+          name: {
+            equals: workspaceName,
+            mode: "insensitive",
+          },
+        },
+      },
+      select: {
+        workspace_id: true,
+      },
+    });
+
+    if (!membership) {
+      throw new Error("Invalid email, workspace, or password");
+    }
+
+    await startWorkspaceSession({
+      userId: existingUser.id,
+      workspaceId: membership.workspace_id,
+    });
+
+    return {
+      redirectTo: "/dashboard",
+    };
+  }
+
+  const passwordHash = await hashPassword(password);
 
   const [recentRequest, activeTokenCount] = await Promise.all([
     prisma.emailVerificationToken.findFirst({
@@ -126,11 +226,6 @@ export async function requestOnboardingVerification(formData: FormData) {
   const tokenHash = hashToken(token);
   const expiresAt = new Date(now.getTime() + TOKEN_TTL_MS);
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true },
-  });
-
   await prisma.$transaction(async (tx) => {
     await tx.emailVerificationToken.deleteMany({
       where: {
@@ -143,6 +238,7 @@ export async function requestOnboardingVerification(formData: FormData) {
       data: {
         email,
         workspace_name: workspaceName,
+        password_hash: passwordHash,
         token_hash: tokenHash,
         expires_at: expiresAt,
         user_id: existingUser?.id ?? null,
@@ -173,6 +269,7 @@ export async function requestOnboardingVerification(formData: FormData) {
 type ConsumeTokenResult = {
   email: string;
   workspaceName: string;
+  passwordHash: string | null;
 };
 
 async function consumeVerificationToken(token: string): Promise<ConsumeTokenResult> {
@@ -191,6 +288,7 @@ async function consumeVerificationToken(token: string): Promise<ConsumeTokenResu
         id: true,
         email: true,
         workspace_name: true,
+        password_hash: true,
         expires_at: true,
         consumed_at: true,
       },
@@ -223,6 +321,7 @@ async function consumeVerificationToken(token: string): Promise<ConsumeTokenResu
     return {
       email: record.email,
       workspaceName: record.workspace_name,
+      passwordHash: record.password_hash,
     };
   });
 }
@@ -232,10 +331,11 @@ export async function completeOnboardingFromVerificationToken(token: string) {
 
   const user = await prisma.user.upsert({
     where: { email: consumed.email },
-    update: {},
+    update: consumed.passwordHash ? { password_hash: consumed.passwordHash } : {},
     create: {
       email: consumed.email,
       name: deriveNameFromEmail(consumed.email),
+      password_hash: consumed.passwordHash,
     },
     select: { id: true },
   });

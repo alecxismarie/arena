@@ -1,13 +1,14 @@
 "use client";
 
 import { startOnboardingClientAction } from "@/app/actions/auth-actions";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 const STAGES = [
   "Validating your details...",
-  "Preparing secure verification...",
-  "Generating your sign-in link...",
-  "Sending to your inbox...",
+  "Checking your account...",
+  "Confirming workspace access...",
+  "Preparing your dashboard...",
   "Finalizing...",
 ] as const;
 
@@ -29,6 +30,7 @@ function getErrorMessage(error: unknown) {
 }
 
 export function OnboardingForm() {
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actualProgress, setActualProgress] = useState(0);
   const [displayProgress, setDisplayProgress] = useState(0);
@@ -108,6 +110,13 @@ export function OnboardingForm() {
       await new Promise((resolve) =>
         window.setTimeout(resolve, COMPLETION_VISIBILITY_MS),
       );
+
+      if ("redirectTo" in result) {
+        setIsSubmitting(false);
+        router.replace(result.redirectTo);
+        return;
+      }
+
       setIsSubmitting(false);
       setVerificationSentTo(result.verificationSentTo);
     } catch (error) {
@@ -193,6 +202,19 @@ export function OnboardingForm() {
             <input
               name="workspace_name"
               placeholder="Enter workspace name"
+              required
+              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
+            />
+          </label>
+
+          <label className="block space-y-1.5 text-sm">
+            <span className="font-medium text-foreground">Password</span>
+            <input
+              type="password"
+              name="password"
+              placeholder="Enter your password"
+              autoComplete="current-password"
+              minLength={8}
               required
               className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
             />
