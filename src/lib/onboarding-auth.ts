@@ -150,7 +150,7 @@ export async function requestOnboardingVerification(formData: FormData) {
     });
   });
 
-  const verifyUrl = `${getBaseUrl()}/auth/verify?token=${encodeURIComponent(token)}`;
+  const verifyUrl = `${getBaseUrl()}/api/auth/verify?token=${encodeURIComponent(token)}`;
   try {
     await sendVerificationMagicLinkEmail({
       toEmail: email,

@@ -44,6 +44,7 @@ APP_BASE_URL="http://localhost:3000"
 BREVO_API_KEY="your-brevo-api-key"
 BREVO_SENDER_EMAIL="no-reply@yourdomain.com"
 BREVO_SENDER_NAME="Signals"
+NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN="your-cloudflare-beacon-token"
 ```
 
 2. Generate Prisma client:
