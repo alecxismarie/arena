@@ -25,7 +25,12 @@ export async function startOnboardingAction(formData: FormData) {
 }
 
 export async function startOnboardingClientAction(formData: FormData) {
-  return requestOnboardingVerification(formData);
+  const result = await requestOnboardingVerification(formData);
+  revalidatePath("/");
+  if ("redirectTo" in result) {
+    revalidatePath("/dashboard");
+  }
+  return result;
 }
 
 export async function logoutAction() {

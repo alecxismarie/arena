@@ -2,7 +2,6 @@
 
 import { startOnboardingClientAction } from "@/app/actions/auth-actions";
 import { Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 const STAGES = [
@@ -22,6 +21,53 @@ const MILESTONES = [
 ] as const;
 
 const COMPLETION_VISIBILITY_MS = 220;
+const REMEMBER_STORAGE_KEY = "signals_onboarding_remember_v1";
+
+type RememberedOnboardingState = {
+  email: string;
+  workspaceName: string;
+  rememberMe: boolean;
+};
+
+function getRememberedOnboardingState(): RememberedOnboardingState {
+  if (typeof window === "undefined") {
+    return {
+      email: "",
+      workspaceName: "",
+      rememberMe: true,
+    };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(REMEMBER_STORAGE_KEY);
+    if (!raw) {
+      return {
+        email: "",
+        workspaceName: "",
+        rememberMe: true,
+      };
+    }
+
+    const parsed = JSON.parse(raw) as {
+      email?: string;
+      workspaceName?: string;
+      rememberMe?: boolean;
+    };
+
+    return {
+      email: parsed.email ?? "",
+      workspaceName: parsed.workspaceName ?? "",
+      rememberMe: parsed.rememberMe !== false,
+    };
+  } catch {
+    window.localStorage.removeItem(REMEMBER_STORAGE_KEY);
+    return {
+      email: "",
+      workspaceName: "",
+      rememberMe: true,
+    };
+  }
+}
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
@@ -31,8 +77,14 @@ function getErrorMessage(error: unknown) {
 }
 
 export function OnboardingForm() {
-  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [remembered] = useState<RememberedOnboardingState>(
+    getRememberedOnboardingState,
+  );
+  const [email, setEmail] = useState(remembered.email);
+  const [workspaceName, setWorkspaceName] = useState(remembered.workspaceName);
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(remembered.rememberMe);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actualProgress, setActualProgress] = useState(0);
   const [displayProgress, setDisplayProgress] = useState(0);
@@ -112,10 +164,22 @@ export function OnboardingForm() {
       await new Promise((resolve) =>
         window.setTimeout(resolve, COMPLETION_VISIBILITY_MS),
       );
+      if (rememberMe) {
+        window.localStorage.setItem(
+          REMEMBER_STORAGE_KEY,
+          JSON.stringify({
+            email: email.trim(),
+            workspaceName: workspaceName.trim(),
+            rememberMe: true,
+          }),
+        );
+      } else {
+        window.localStorage.removeItem(REMEMBER_STORAGE_KEY);
+      }
 
       if ("redirectTo" in result) {
         setIsSubmitting(false);
-        router.replace(result.redirectTo);
+        window.location.assign(result.redirectTo);
         return;
       }
 
@@ -194,8 +258,10 @@ export function OnboardingForm() {
               name="email"
               placeholder="you@company.com"
               autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
               required
-              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
+              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20 sm:text-sm"
             />
           </label>
 
@@ -204,8 +270,10 @@ export function OnboardingForm() {
             <input
               name="workspace_name"
               placeholder="Enter workspace name"
+              value={workspaceName}
+              onChange={(event) => setWorkspaceName(event.target.value)}
               required
-              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
+              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20 sm:text-sm"
             />
           </label>
 
@@ -217,9 +285,11 @@ export function OnboardingForm() {
                 name="password"
                 placeholder="Enter your password"
                 autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
                 minLength={8}
                 required
-                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 pr-11 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
+                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 pr-11 text-base text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20 sm:text-sm"
               />
               <button
                 type="button"
@@ -241,7 +311,8 @@ export function OnboardingForm() {
               type="checkbox"
               name="remember_me"
               value="1"
-              defaultChecked
+              checked={rememberMe}
+              onChange={(event) => setRememberMe(event.target.checked)}
               className="h-4 w-4 accent-accent"
             />
             <span className="font-medium text-foreground">Remember me</span>
