@@ -1,4 +1,4 @@
-import { startOnboardingAction } from "@/app/actions/auth-actions";
+import { OnboardingForm } from "@/components/onboarding/onboarding-form";
 import { getAuthContext } from "@/lib/auth";
 import Image from "next/image";
 import { redirect } from "next/navigation";
@@ -67,36 +67,7 @@ export default async function HomePage() {
               Use your work email and workspace name to continue.
             </p>
 
-            <form action={startOnboardingAction} className="mt-5 space-y-4">
-              <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-foreground">Email</span>
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="you@company.com"
-                  autoComplete="email"
-                  required
-                  className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
-                />
-              </label>
-
-              <label className="block space-y-1.5 text-sm">
-                <span className="font-medium text-foreground">Workspace name</span>
-                <input
-                  name="workspace_name"
-                  placeholder="Enter workspace name"
-                  required
-                  className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
-                />
-              </label>
-
-              <button
-                type="submit"
-                className="btn-primary w-full rounded-xl px-4 py-2.5 text-sm font-semibold"
-              >
-                Continue
-              </button>
-            </form>
+            <OnboardingForm />
           </div>
         </div>
       </section>

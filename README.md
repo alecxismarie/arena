@@ -40,6 +40,10 @@ No profit/expense/commission/forecasting features are included in Phase 1.
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/arena_db?schema=public"
+APP_BASE_URL="http://localhost:3000"
+BREVO_API_KEY="your-brevo-api-key"
+BREVO_SENDER_EMAIL="no-reply@yourdomain.com"
+BREVO_SENDER_NAME="Signals"
 ```
 
 2. Generate Prisma client:
