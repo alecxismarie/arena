@@ -6,7 +6,10 @@ import { prisma } from "@/lib/prisma";
 
 const SESSION_COOKIE_NAME = "signals_session";
 const IDENTITY_COOKIE_NAME = "signals_identity";
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const REMEMBER_PREFERENCE_COOKIE_NAME = "signals_remember_me";
+const SESSION_PERSISTENT_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const SESSION_NON_PERSISTENT_MAX_AGE_SECONDS = 60 * 60 * 24;
+const REMEMBER_PREFERENCE_MAX_AGE_SECONDS = 60 * 15;
 
 const cookieOptions = {
   httpOnly: true,
@@ -120,7 +123,7 @@ export async function setIdentityCookie(userId: string) {
   const cookieStore = await cookies();
   cookieStore.set(IDENTITY_COOKIE_NAME, userId, {
     ...cookieOptions,
-    maxAge: SESSION_MAX_AGE_SECONDS,
+    maxAge: SESSION_PERSISTENT_MAX_AGE_SECONDS,
   });
 }
 
@@ -140,11 +143,38 @@ export async function clearSessionCookie() {
   });
 }
 
+export async function setRememberPreferenceCookie(rememberMe: boolean) {
+  const cookieStore = await cookies();
+  cookieStore.set(REMEMBER_PREFERENCE_COOKIE_NAME, rememberMe ? "1" : "0", {
+    ...cookieOptions,
+    maxAge: REMEMBER_PREFERENCE_MAX_AGE_SECONDS,
+  });
+}
+
+export async function consumeRememberPreferenceCookie() {
+  const cookieStore = await cookies();
+  const rawValue = cookieStore.get(REMEMBER_PREFERENCE_COOKIE_NAME)?.value?.trim();
+
+  cookieStore.set(REMEMBER_PREFERENCE_COOKIE_NAME, "", {
+    ...cookieOptions,
+    maxAge: 0,
+  });
+
+  if (rawValue === "1") return true;
+  if (rawValue === "0") return false;
+  return true;
+}
+
 export async function startWorkspaceSession(params: {
   userId: string;
   workspaceId: string;
+  rememberMe?: boolean;
 }) {
-  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
+  const rememberMe = params.rememberMe ?? true;
+  const sessionMaxAgeSeconds = rememberMe
+    ? SESSION_PERSISTENT_MAX_AGE_SECONDS
+    : SESSION_NON_PERSISTENT_MAX_AGE_SECONDS;
+  const expiresAt = new Date(Date.now() + sessionMaxAgeSeconds * 1000);
 
   const session = await prisma.session.create({
     data: {
@@ -156,10 +186,16 @@ export async function startWorkspaceSession(params: {
   });
 
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, session.id, {
-    ...cookieOptions,
-    maxAge: SESSION_MAX_AGE_SECONDS,
-  });
+  cookieStore.set(
+    SESSION_COOKIE_NAME,
+    session.id,
+    rememberMe
+      ? {
+          ...cookieOptions,
+          maxAge: sessionMaxAgeSeconds,
+        }
+      : cookieOptions,
+  );
   cookieStore.set(IDENTITY_COOKIE_NAME, "", {
     ...cookieOptions,
     maxAge: 0,

@@ -1,6 +1,7 @@
 "use client";
 
 import { startOnboardingClientAction } from "@/app/actions/auth-actions";
+import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 
@@ -31,6 +32,7 @@ function getErrorMessage(error: unknown) {
 
 export function OnboardingForm() {
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actualProgress, setActualProgress] = useState(0);
   const [displayProgress, setDisplayProgress] = useState(0);
@@ -209,15 +211,40 @@ export function OnboardingForm() {
 
           <label className="block space-y-1.5 text-sm">
             <span className="font-medium text-foreground">Password</span>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                minLength={8}
+                required
+                className="w-full rounded-xl border border-border bg-card px-3 py-2.5 pr-11 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((current) => !current)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-accent transition hover:bg-accent/10"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" aria-hidden />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden />
+                )}
+              </button>
+            </div>
+          </label>
+
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
             <input
-              type="password"
-              name="password"
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              minLength={8}
-              required
-              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent/70 focus:ring-2 focus:ring-accent/20"
+              type="checkbox"
+              name="remember_me"
+              value="1"
+              defaultChecked
+              className="h-4 w-4 accent-accent"
             />
+            <span className="font-medium text-foreground">Remember me</span>
           </label>
 
           {errorMessage ? (

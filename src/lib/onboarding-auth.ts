@@ -7,7 +7,11 @@ import {
   timingSafeEqual,
 } from "crypto";
 import { promisify } from "util";
-import { startWorkspaceSession } from "@/lib/auth";
+import {
+  consumeRememberPreferenceCookie,
+  setRememberPreferenceCookie,
+  startWorkspaceSession,
+} from "@/lib/auth";
 import { sendVerificationMagicLinkEmail } from "@/lib/brevo";
 import { prisma } from "@/lib/prisma";
 import {
@@ -71,6 +75,13 @@ function parsePassword(value: FormDataEntryValue | null) {
   }
 
   return password;
+}
+
+function parseRememberMe(value: FormDataEntryValue | null) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "on";
 }
 
 function deriveNameFromEmail(email: string) {
@@ -146,6 +157,7 @@ export async function requestOnboardingVerification(
   const email = parseEmail(formData.get("email"));
   const workspaceName = parseWorkspaceName(formData.get("workspace_name"));
   const password = parsePassword(formData.get("password"));
+  const rememberMe = parseRememberMe(formData.get("remember_me"));
   const now = new Date();
 
   const existingUser = await prisma.user.findUnique({
@@ -184,6 +196,7 @@ export async function requestOnboardingVerification(
     await startWorkspaceSession({
       userId: existingUser.id,
       workspaceId: membership.workspace_id,
+      rememberMe,
     });
 
     return {
@@ -192,6 +205,7 @@ export async function requestOnboardingVerification(
   }
 
   const passwordHash = await hashPassword(password);
+  await setRememberPreferenceCookie(rememberMe);
 
   const [recentRequest, activeTokenCount] = await Promise.all([
     prisma.emailVerificationToken.findFirst({
@@ -328,6 +342,7 @@ async function consumeVerificationToken(token: string): Promise<ConsumeTokenResu
 
 export async function completeOnboardingFromVerificationToken(token: string) {
   const consumed = await consumeVerificationToken(token);
+  const rememberMe = await consumeRememberPreferenceCookie();
 
   const user = await prisma.user.upsert({
     where: { email: consumed.email },
@@ -345,6 +360,7 @@ export async function completeOnboardingFromVerificationToken(token: string) {
     await startWorkspaceSession({
       userId: user.id,
       workspaceId,
+      rememberMe,
     });
 
     return {
@@ -376,6 +392,7 @@ export async function completeOnboardingFromVerificationToken(token: string) {
   await startWorkspaceSession({
     userId: user.id,
     workspaceId: workspace.id,
+    rememberMe,
   });
 
   return {
