@@ -83,7 +83,7 @@ export function TeamMembersForm({ members }: { members: TeamMember[] }) {
         </div>
         {showInviteNotice ? (
           <p className="mt-3 rounded-lg border border-border/50 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
-            They&apos;ll receive an email to accept the invitation and sign in.
+            They&apos;ll receive an invitation email with workspace access details and a secure accept link.
           </p>
         ) : null}
       </form>
@@ -99,7 +99,7 @@ export function TeamMembersForm({ members }: { members: TeamMember[] }) {
               key={member.userId}
               className="rounded-2xl border border-border/60 bg-background/55 p-4"
             >
-              <div className="grid gap-3 md:grid-cols-[1.4fr_1fr_auto]">
+              <div className="grid gap-3 md:grid-cols-[1.4fr_1fr]">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
                     {member.name || "Unnamed user"}
@@ -115,10 +115,12 @@ export function TeamMembersForm({ members }: { members: TeamMember[] }) {
                 <form action={updateTeamMemberRoleAction} className="space-y-1.5">
                   <input type="hidden" name="user_id" value={member.userId} />
                   <span className="block text-sm font-medium text-foreground">Role</span>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <BrandSelect
                       name="role"
                       defaultValue={member.role}
+                      className="min-w-0 flex-1"
+                      triggerClassName="h-11 py-0"
                       options={[
                         { value: "owner", label: "Owner" },
                         { value: "editor", label: "Editor" },
@@ -126,25 +128,20 @@ export function TeamMembersForm({ members }: { members: TeamMember[] }) {
                     />
                     <button
                       type="submit"
-                      className="btn-secondary rounded-xl px-3 py-2 text-sm font-medium"
+                      className="btn-secondary h-11 shrink-0 rounded-xl px-3 py-2 text-sm font-medium whitespace-nowrap"
                     >
                       Update
                     </button>
-                  </div>
-                </form>
-
-                <div className="flex items-start justify-end">
-                  <form action={removeTeamMemberAction}>
-                    <input type="hidden" name="user_id" value={member.userId} />
                     <button
                       type="submit"
+                      formAction={removeTeamMemberAction}
                       disabled={member.isCurrentUser}
-                      className="btn-secondary rounded-xl px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                      className="btn-secondary h-11 shrink-0 rounded-xl px-3 py-2 text-sm font-medium whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Remove
                     </button>
-                  </form>
-                </div>
+                  </div>
+                </form>
               </div>
             </article>
           ))

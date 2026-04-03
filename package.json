@@ -12,7 +12,7 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
-    "db:migrate:baseline": "prisma migrate resolve --applied 20260330_step0_baseline_bootstrap && prisma migrate resolve --applied 20260331_step1_auth_workspace_scoping_additive && prisma migrate resolve --applied 20260401_step2_analytics_aggregate_and_indexes && prisma migrate resolve --applied 20260402_step3_email_verification_additive && prisma migrate resolve --applied 20260402_step4_password_auth_additive",
+    "db:migrate:baseline": "prisma migrate resolve --applied 20260330_step0_baseline_bootstrap && prisma migrate resolve --applied 20260331_step1_auth_workspace_scoping_additive && prisma migrate resolve --applied 20260401_step2_analytics_aggregate_and_indexes && prisma migrate resolve --applied 20260402_step3_email_verification_additive && prisma migrate resolve --applied 20260402_step4_password_auth_additive && prisma migrate resolve --applied 20260403_step5_workspace_invitation_tokens_additive",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts"
   },

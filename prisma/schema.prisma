@@ -29,6 +29,7 @@ model User {
   memberships WorkspaceMembership[]
   sessions    Session[]
   verification_tokens EmailVerificationToken[]
+  sent_workspace_invites WorkspaceInvitationToken[] @relation("WorkspaceInvitationSender")
 }
 
 model Workspace {
@@ -43,6 +44,7 @@ model Workspace {
   memberships      WorkspaceMembership[]
   sessions         Session[]
   daily_aggregates WorkspaceDailyAggregate[]
+  invitation_tokens WorkspaceInvitationToken[]
 }
 
 model Venue {
@@ -171,5 +173,24 @@ model EmailVerificationToken {
   user           User?     @relation(fields: [user_id], references: [id], onDelete: SetNull)
 
   @@index([email, created_at])
+  @@index([expires_at])
+}
+
+model WorkspaceInvitationToken {
+  id                 String        @id @default(cuid())
+  workspace_id       String
+  invited_by_user_id String
+  invited_email      String
+  invited_name       String
+  invited_role       WorkspaceRole
+  token_hash         String        @unique
+  expires_at         DateTime
+  consumed_at        DateTime?
+  created_at         DateTime      @default(now())
+  updated_at         DateTime      @updatedAt
+  workspace          Workspace     @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  invited_by_user    User          @relation("WorkspaceInvitationSender", fields: [invited_by_user_id], references: [id], onDelete: Cascade)
+
+  @@index([workspace_id, invited_email, created_at])
   @@index([expires_at])
 }

@@ -8,6 +8,7 @@ import {
   startWorkspaceSession,
 } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createWorkspaceInvitation } from "@/lib/workspace-invitations";
 import {
   WORKSPACE_DEFAULT_CURRENCY,
   WORKSPACE_DEFAULT_TIMEZONE,
@@ -230,62 +231,98 @@ export async function addTeamMemberAction(formData: FormData) {
   const email = parseEmail(formData.get("email"));
   const role = parseWorkspaceRole(formData.get("role"));
 
-  await prisma.$transaction(async (tx) => {
-    const user = await tx.user.upsert({
-      where: { email },
-      update: {},
-      create: {
+  const existingMembership = await prisma.workspaceMembership.findFirst({
+    where: {
+      workspace_id: context.workspaceId,
+      user: {
         email,
-        name,
       },
-      select: { id: true },
-    });
+    },
+    select: {
+      user_id: true,
+      role: true,
+    },
+  });
 
-    const existingMembership = await tx.workspaceMembership.findUnique({
-      where: {
-        workspace_id_user_id: {
-          workspace_id: context.workspaceId,
-          user_id: user.id,
+  if (existingMembership) {
+    await prisma.$transaction(async (tx) => {
+      const currentMembership = await tx.workspaceMembership.findUnique({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: context.workspaceId,
+            user_id: existingMembership.user_id,
+          },
         },
-      },
-      select: {
-        role: true,
-      },
-    });
+        select: {
+          role: true,
+        },
+      });
 
-    if (!existingMembership) {
-      await tx.workspaceMembership.create({
+      if (!currentMembership || currentMembership.role === role) {
+        return;
+      }
+
+      if (currentMembership.role === "owner" && role === "editor") {
+        await assertOwnerCountAfterDemotion({
+          tx,
+          workspaceId: context.workspaceId,
+        });
+      }
+
+      await tx.workspaceMembership.update({
+        where: {
+          workspace_id_user_id: {
+            workspace_id: context.workspaceId,
+            user_id: existingMembership.user_id,
+          },
+        },
         data: {
-          workspace_id: context.workspaceId,
-          user_id: user.id,
           role,
         },
       });
-      return;
-    }
-
-    if (existingMembership.role === role) {
-      return;
-    }
-
-    if (existingMembership.role === "owner" && role === "editor") {
-      await assertOwnerCountAfterDemotion({
-        tx,
-        workspaceId: context.workspaceId,
-      });
-    }
-
-    await tx.workspaceMembership.update({
-      where: {
-        workspace_id_user_id: {
-          workspace_id: context.workspaceId,
-          user_id: user.id,
-        },
-      },
-      data: {
-        role,
-      },
     });
+
+    revalidatePath("/dashboard");
+    revalidatePath("/settings");
+    return;
+  }
+
+  const [workspace, inviter] = await Promise.all([
+    prisma.workspace.findUnique({
+      where: {
+        id: context.workspaceId,
+      },
+      select: {
+        name: true,
+      },
+    }),
+    prisma.user.findUnique({
+      where: {
+        id: context.userId,
+      },
+      select: {
+        name: true,
+        email: true,
+      },
+    }),
+  ]);
+
+  if (!workspace) {
+    throw new Error("Workspace not found");
+  }
+  if (!inviter) {
+    throw new Error("Inviter account not found");
+  }
+
+  await createWorkspaceInvitation({
+    workspaceId: context.workspaceId,
+    workspaceName: workspace.name,
+    invitedByUserId: context.userId,
+    invitedByName: inviter.name,
+    invitedByEmail: inviter.email,
+    invitedEmail: email,
+    invitedName: name,
+    invitedRole: role,
   });
 
   revalidatePath("/dashboard");

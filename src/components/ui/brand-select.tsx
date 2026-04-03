@@ -18,6 +18,7 @@ type BrandSelectProps = {
   placeholder?: string;
   emptyMessage?: string;
   className?: string;
+  triggerClassName?: string;
 };
 
 export function BrandSelect({
@@ -29,6 +30,7 @@ export function BrandSelect({
   placeholder,
   emptyMessage = "No options available",
   className,
+  triggerClassName,
 }: BrandSelectProps) {
   const [open, setOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
@@ -102,6 +104,7 @@ export function BrandSelect({
         className={cn(
           "w-full rounded-xl border border-border bg-background px-3 py-2.5 text-left text-foreground outline-none transition focus-visible:border-accent/70 focus-visible:ring-2 focus-visible:ring-accent/10",
           open && "border-accent/70 ring-2 ring-accent/10",
+          triggerClassName,
         )}
       >
         <span className="flex items-center justify-between gap-2">
