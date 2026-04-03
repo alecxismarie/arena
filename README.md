@@ -71,6 +71,23 @@ npm run db:seed
 npm run dev
 ```
 
+## Vercel Production Auto-Migrations
+
+This project is configured so Vercel uses:
+
+```bash
+npm run vercel-build
+```
+
+Behavior:
+
+- Production deploy (`VERCEL_ENV=production`): runs `prisma migrate deploy`, then builds.
+- Preview/dev deploy: skips migration and only builds.
+
+Requirements:
+
+- Vercel `DATABASE_URL` (Production environment) must point to your production database.
+
 ## Migration Baseline Strategy
 
 Signals now includes an idempotent baseline migration (`20260330_step0_baseline_bootstrap`) so fresh databases can apply migrations cleanly.
