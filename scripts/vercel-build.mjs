@@ -33,4 +33,7 @@ if (isProduction) {
   console.log("[vercel-build] Skipping prisma migrate deploy (non-production build).");
 }
 
+console.log("[vercel-build] Generating Prisma Client.");
+run("npx", ["prisma", "generate"]);
+
 run("npm", ["run", "build:next"]);
