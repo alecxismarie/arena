@@ -30,7 +30,14 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  const [data, workspace, account, inventoryRecordCount, assetRecordCount] = await Promise.all([
+  const [
+    data,
+    workspace,
+    account,
+    inventoryProductCount,
+    inventoryReportCount,
+    assetRecordCount,
+  ] = await Promise.all([
     getDashboardData(),
     getCurrentWorkspace(),
     prisma.user.findUnique({
@@ -39,7 +46,10 @@ export default async function DashboardPage() {
         name: true,
       },
     }),
-    prisma.inventoryRecord.count({
+    prisma.product.count({
+      where: { workspace_id: context.workspaceId },
+    }),
+    prisma.dailyProductReport.count({
       where: { workspace_id: context.workspaceId },
     }),
     prisma.assetRecord.count({
@@ -53,7 +63,10 @@ export default async function DashboardPage() {
   const totalEvents =
     data.stats.find((stat) => stat.key === "events")?.value ?? 0;
   const hasAnyDomainData =
-    totalEvents > 0 || inventoryRecordCount > 0 || assetRecordCount > 0;
+    totalEvents > 0 ||
+    inventoryProductCount > 0 ||
+    inventoryReportCount > 0 ||
+    assetRecordCount > 0;
   const domainCards = [
     {
       key: "events",
@@ -67,11 +80,21 @@ export default async function DashboardPage() {
     {
       key: "inventory",
       title: "Inventory",
-      count: inventoryRecordCount,
-      description: "Monitor sell-through, waste, stock posture, and revenue per unit.",
+      count: inventoryReportCount,
+      description: "Monitor daily sales, computed revenue, and gross profit by product.",
       href: "/inventory",
-      ctaHref: inventoryRecordCount > 0 ? "/inventory" : "/inventory/new",
-      ctaLabel: inventoryRecordCount > 0 ? "Open inventory" : "Add inventory record",
+      ctaHref:
+        inventoryProductCount > 0
+          ? inventoryReportCount > 0
+            ? "/inventory"
+            : "/inventory/reports/new"
+          : "/inventory/products/new",
+      ctaLabel:
+        inventoryProductCount > 0
+          ? inventoryReportCount > 0
+            ? "Open inventory"
+            : "Add daily report"
+          : "Add product",
     },
     {
       key: "assets",
@@ -119,10 +142,10 @@ export default async function DashboardPage() {
               Create event
             </Link>
             <Link
-              href="/inventory/new"
+              href="/inventory/products/new"
               className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-medium"
             >
-              Add inventory record
+              Add product
             </Link>
             <Link
               href="/assets/new"

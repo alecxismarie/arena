@@ -1,28 +1,49 @@
 "use server";
 
+import { Prisma } from "@prisma/client";
 import { assertCanOperateInventory, canViewFinancial } from "@/lib/access-control";
 import { requireAuthContext } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import {
+  createDailyInventoryReport,
+  createInventoryProduct,
+} from "@/lib/inventory";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-export type InventoryFormState = {
+export type ProductFormState = {
   error: string | null;
 };
 
-export const INITIAL_INVENTORY_FORM_STATE: InventoryFormState = {
+export const INITIAL_PRODUCT_FORM_STATE: ProductFormState = {
   error: null,
 };
 
-function parseProductName(value: FormDataEntryValue | null) {
-  const productName = String(value ?? "").trim();
-  if (!productName) {
-    throw new Error("Product name is required");
+export type DailyReportFormState = {
+  error: string | null;
+};
+
+export const INITIAL_DAILY_REPORT_FORM_STATE: DailyReportFormState = {
+  error: null,
+};
+
+function parseName(value: FormDataEntryValue | null, field: string) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    throw new Error(`${field} is required`);
   }
-  if (productName.length > 120) {
-    throw new Error("Product name must be 120 characters or less");
+  if (normalized.length > 120) {
+    throw new Error(`${field} must be 120 characters or less`);
   }
-  return productName;
+  return normalized;
+}
+
+function parseOptionalText(value: FormDataEntryValue | null, maxLength: number) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return null;
+  if (normalized.length > maxLength) {
+    throw new Error(`Category must be ${maxLength} characters or less`);
+  }
+  return normalized;
 }
 
 function parseDateInput(value: FormDataEntryValue | null, field: string) {
@@ -81,81 +102,112 @@ function parseNonNegativeNumber(
   return parsed;
 }
 
-function parseOptionalNonNegativeDecimal(
-  value: FormDataEntryValue | null,
-  field: string,
-) {
-  if (value === null || value === "") {
-    return null;
+function parseProductId(value: FormDataEntryValue | null) {
+  const productId = String(value ?? "").trim();
+  if (!productId) {
+    throw new Error("Product is required");
   }
-
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`Invalid ${field}`);
-  }
-  if (parsed < 0) {
-    throw new Error(`${field} must be greater than or equal to 0`);
-  }
-
-  return Number(parsed.toFixed(2));
+  return productId;
 }
 
-function safeErrorMessage(error: unknown) {
+function safeErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) {
     return error.message;
   }
-  return "Unable to save inventory record. Please try again.";
+  return fallback;
 }
 
-export async function createInventoryRecordAction(
-  _previousState: InventoryFormState,
+export async function createProductAction(
+  _previousState: ProductFormState,
   formData: FormData,
-): Promise<InventoryFormState> {
+): Promise<ProductFormState> {
   const context = await requireAuthContext();
   assertCanOperateInventory(context);
 
+  if (!canViewFinancial(context.role)) {
+    return {
+      error: "Only workspace owners can create products with pricing.",
+    };
+  }
+
   try {
-    const productName = parseProductName(formData.get("product_name"));
-    const recordDate = parseDateInput(formData.get("record_date"), "record date");
-    const unitsIn = parseNonNegativeNumber(formData.get("units_in"), "units in");
-    const unitsOut = parseNonNegativeNumber(formData.get("units_out"), "units out");
-    const remainingStock = parseNonNegativeNumber(
-      formData.get("remaining_stock"),
-      "remaining stock",
-    );
-    const wasteUnits = parseNonNegativeNumber(
-      formData.get("waste_units"),
-      "waste units",
+    const name = parseName(formData.get("name"), "Product name");
+    const sellingPrice = parseNonNegativeNumber(
+      formData.get("selling_price"),
+      "Selling price",
       {
-        required: false,
-        defaultValue: 0,
+        integer: false,
       },
     );
+    const costPrice = parseNonNegativeNumber(formData.get("cost_price"), "Cost price", {
+      integer: false,
+    });
+    const category = parseOptionalText(formData.get("category"), 80);
 
-    // Opening stock is not modeled in Inventory v1, so outbound upper-bound
-    // validation is intentionally limited to non-negative and numeric checks.
-    const revenue = canViewFinancial(context.role)
-      ? parseOptionalNonNegativeDecimal(formData.get("revenue"), "revenue")
-      : null;
-
-    await prisma.inventoryRecord.create({
-      data: {
-        workspace_id: context.workspaceId,
-        product_name: productName,
-        record_date: recordDate,
-        units_in: unitsIn,
-        units_out: unitsOut,
-        remaining_stock: remainingStock,
-        waste_units: wasteUnits,
-        revenue,
-      },
+    await createInventoryProduct({
+      workspaceId: context.workspaceId,
+      name,
+      sellingPrice: Number(sellingPrice.toFixed(2)),
+      costPrice: Number(costPrice.toFixed(2)),
+      category,
     });
   } catch (error) {
     return {
-      error: safeErrorMessage(error),
+      error: safeErrorMessage(error, "Unable to save product. Please try again."),
     };
   }
 
   revalidatePath("/inventory");
+  revalidatePath("/inventory/products");
+  redirect("/inventory/products");
+}
+
+export async function createDailyProductReportAction(
+  _previousState: DailyReportFormState,
+  formData: FormData,
+): Promise<DailyReportFormState> {
+  const context = await requireAuthContext();
+  assertCanOperateInventory(context);
+
+  try {
+    const productId = parseProductId(formData.get("product_id"));
+    const reportDate = parseDateInput(formData.get("report_date"), "report date");
+    const beginningStock = parseNonNegativeNumber(
+      formData.get("beginning_stock"),
+      "Beginning stock",
+    );
+    const stockAdded = parseNonNegativeNumber(formData.get("stock_added"), "Stock added");
+    const endingStock = parseNonNegativeNumber(formData.get("ending_stock"), "Ending stock");
+    const wasteUnits = parseNonNegativeNumber(formData.get("waste_units"), "Waste units", {
+      required: false,
+      defaultValue: 0,
+    });
+
+    await createDailyInventoryReport({
+      workspaceId: context.workspaceId,
+      productId,
+      reportDate,
+      beginningStock,
+      stockAdded,
+      endingStock,
+      wasteUnits,
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return {
+        error: "A report for this product and date already exists.",
+      };
+    }
+
+    return {
+      error: safeErrorMessage(error, "Unable to save daily report. Please try again."),
+    };
+  }
+
+  revalidatePath("/inventory");
+  revalidatePath("/inventory/reports/new");
   redirect("/inventory");
 }

@@ -140,6 +140,8 @@ async function main() {
   await prisma.emailVerificationToken.deleteMany();
   await prisma.session.deleteMany();
   await prisma.workspaceMembership.deleteMany();
+  await prisma.dailyProductReport.deleteMany();
+  await prisma.product.deleteMany();
   await prisma.assetRecord.deleteMany();
   await prisma.inventoryRecord.deleteMany();
   await prisma.attendanceLog.deleteMany();
@@ -287,6 +289,97 @@ async function main() {
         waste_units: 6,
         revenue: Number((126 * 9).toFixed(2)),
       },
+    ],
+  });
+
+  const [coffee, croissant, signatureSandwich, bottledWater] = await prisma.$transaction([
+    prisma.product.create({
+      data: {
+        workspace_id: workspace.id,
+        name: "Iced Latte",
+        selling_price: 5.8,
+        cost_price: 2.15,
+        category: "Beverage",
+        is_active: true,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        workspace_id: workspace.id,
+        name: "Butter Croissant",
+        selling_price: 3.4,
+        cost_price: 1.05,
+        category: "Pastry",
+        is_active: true,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        workspace_id: workspace.id,
+        name: "Signature Chicken Sandwich",
+        selling_price: 8.9,
+        cost_price: 3.75,
+        category: "Food",
+        is_active: true,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        workspace_id: workspace.id,
+        name: "Bottled Water",
+        selling_price: 2.2,
+        cost_price: 0.55,
+        category: "Beverage",
+        is_active: true,
+      },
+    }),
+  ]);
+
+  const toMoney = (value: number) => Number(value.toFixed(2));
+  const createDailyProductReport = (
+    product: {
+      id: string;
+      selling_price: unknown;
+      cost_price: unknown;
+    },
+    reportDate: Date,
+    beginningStock: number,
+    stockAdded: number,
+    endingStock: number,
+    wasteUnits = 0,
+  ) => {
+    const unitsSold = beginningStock + stockAdded - endingStock - wasteUnits;
+    const sellingPrice = Number(product.selling_price);
+    const costPrice = Number(product.cost_price);
+    const revenue = toMoney(unitsSold * sellingPrice);
+    const cogs = toMoney(unitsSold * costPrice);
+    const grossProfit = toMoney(revenue - cogs);
+
+    return {
+      workspace_id: workspace.id,
+      product_id: product.id,
+      report_date: reportDate,
+      beginning_stock: beginningStock,
+      stock_added: stockAdded,
+      ending_stock: endingStock,
+      waste_units: wasteUnits,
+      units_sold: unitsSold,
+      revenue,
+      cogs,
+      gross_profit: grossProfit,
+    };
+  };
+
+  await prisma.dailyProductReport.createMany({
+    data: [
+      createDailyProductReport(coffee, subDays(today, 2), 40, 20, 18, 2),
+      createDailyProductReport(coffee, subDays(today, 1), 38, 24, 17, 1),
+      createDailyProductReport(croissant, subDays(today, 2), 30, 20, 11, 3),
+      createDailyProductReport(croissant, subDays(today, 1), 28, 16, 10, 2),
+      createDailyProductReport(signatureSandwich, subDays(today, 2), 22, 14, 8, 1),
+      createDailyProductReport(signatureSandwich, subDays(today, 1), 24, 16, 9, 1),
+      createDailyProductReport(bottledWater, subDays(today, 2), 60, 20, 30, 4),
+      createDailyProductReport(bottledWater, subDays(today, 1), 50, 20, 28, 3),
     ],
   });
 

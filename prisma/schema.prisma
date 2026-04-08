@@ -45,6 +45,8 @@ model Workspace {
   sessions         Session[]
   daily_aggregates WorkspaceDailyAggregate[]
   inventory_records InventoryRecord[]
+  products         Product[]
+  daily_product_reports DailyProductReport[]
   asset_records    AssetRecord[]
   invitation_tokens WorkspaceInvitationToken[]
 }
@@ -182,6 +184,46 @@ model InventoryRecord {
   @@index([workspace_id, record_date])
   @@index([workspace_id, product_name, record_date])
   @@index([record_date])
+}
+
+model Product {
+  id            String    @id @default(cuid())
+  workspace_id  String
+  name          String
+  selling_price Decimal   @db.Decimal(12, 2)
+  cost_price    Decimal   @db.Decimal(12, 2)
+  category      String?
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  workspace     Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  daily_reports DailyProductReport[]
+
+  @@index([workspace_id, name])
+  @@index([workspace_id, is_active])
+}
+
+model DailyProductReport {
+  id              String    @id @default(cuid())
+  workspace_id    String
+  product_id      String
+  report_date     DateTime
+  beginning_stock Int
+  stock_added     Int
+  ending_stock    Int
+  waste_units     Int       @default(0)
+  units_sold      Int
+  revenue         Decimal   @db.Decimal(12, 2)
+  cogs            Decimal   @db.Decimal(12, 2)
+  gross_profit    Decimal   @db.Decimal(12, 2)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  product         Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@unique([workspace_id, product_id, report_date])
+  @@index([workspace_id, report_date])
+  @@index([workspace_id, product_id, report_date])
 }
 
 model AssetRecord {
