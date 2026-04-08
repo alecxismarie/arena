@@ -3,7 +3,9 @@
 import { logoutAction } from "@/app/actions/auth-actions";
 import { cn } from "@/lib/utils";
 import {
+  Box,
   BarChart3,
+  Boxes,
   CalendarDays,
   Cog,
   LayoutDashboard,
@@ -14,9 +16,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/events", label: "Events", icon: Ticket },
+  { href: "/inventory", label: "Inventory", icon: Boxes },
+  { href: "/assets", label: "Assets", icon: Box },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/reports", label: "Reports", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Cog },
 ];

@@ -26,12 +26,48 @@ export default async function ReportsPage() {
     getCurrentWorkspace(),
   ]);
 
+  if (report.eventSummaryRows.length === 0) {
+    return (
+      <div className="space-y-6">
+        <header className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.8)]">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Reports</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Event reports become available after your first event record.
+          </p>
+        </header>
+
+        <section className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+          <h2 className="text-lg font-semibold text-foreground">Get started</h2>
+          <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+            <li>Create your first event</li>
+            <li>Log expected and actual attendance</li>
+            <li>Return here for event sales and attendance reporting</li>
+          </ol>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link
+              href="/events/new"
+              className="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
+            >
+              Create event
+            </Link>
+            <Link
+              href="/events"
+              className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-medium"
+            >
+              Open events
+            </Link>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <header className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.8)]">
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Reports</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review performance trends and expected vs actual attendance.
+          Event performance reports across sales, attendance, and revenue.
         </p>
         {canViewFinancial ? (
           <div className="mt-4 flex flex-wrap gap-2">

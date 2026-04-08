@@ -52,6 +52,7 @@ async function seedEvent({
   name,
   description,
   date,
+  workspaceId,
   venueId,
   capacity,
   ticketPrice,
@@ -62,6 +63,7 @@ async function seedEvent({
   name: string;
   description: string;
   date: Date;
+  workspaceId: string;
   venueId: string;
   capacity: number;
   ticketPrice: number;
@@ -89,6 +91,7 @@ async function seedEvent({
       date,
       start_time: start,
       end_time: end,
+      workspace_id: workspaceId,
       venue_id: venueId,
       capacity,
       expected_attendees: expectedAttendees,
@@ -133,6 +136,12 @@ async function seedEvent({
 }
 
 async function main() {
+  await prisma.workspaceInvitationToken.deleteMany();
+  await prisma.emailVerificationToken.deleteMany();
+  await prisma.session.deleteMany();
+  await prisma.workspaceMembership.deleteMany();
+  await prisma.assetRecord.deleteMany();
+  await prisma.inventoryRecord.deleteMany();
   await prisma.attendanceLog.deleteMany();
   await prisma.ticketSale.deleteMany();
   await prisma.event.deleteMany();
@@ -140,19 +149,33 @@ async function main() {
   await prisma.user.deleteMany();
   await prisma.workspace.deleteMany();
 
-  await prisma.workspace.create({
+  const workspace = await prisma.workspace.create({
     data: {
       name: "Signals Workspace",
       timezone: "UTC",
       currency: "USD",
     },
+    select: {
+      id: true,
+    },
   });
 
-  await prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       name: "Arena Director",
       email: "director@cockpitarena.io",
       role: "admin",
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  await prisma.workspaceMembership.create({
+    data: {
+      workspace_id: workspace.id,
+      user_id: user.id,
+      role: "owner",
     },
   });
 
@@ -161,6 +184,7 @@ async function main() {
       data: {
         name: "Main Cockpit Arena",
         location: "North District",
+        workspace_id: workspace.id,
         capacity: 1200,
       },
     }),
@@ -168,6 +192,7 @@ async function main() {
       data: {
         name: "East Wing Pavilion",
         location: "East District",
+        workspace_id: workspace.id,
         capacity: 780,
       },
     }),
@@ -175,6 +200,7 @@ async function main() {
       data: {
         name: "Ringside Hall",
         location: "Central Strip",
+        workspace_id: workspace.id,
         capacity: 520,
       },
     }),
@@ -190,6 +216,7 @@ async function main() {
       description:
         "Past headliner event with premium seating, arena-wide promotion, and sold ticket history.",
       date,
+      workspaceId: workspace.id,
       venueId: venue.id,
       capacity: venue.capacity,
       ticketPrice: randomInt(28, 85),
@@ -208,6 +235,7 @@ async function main() {
       description:
         "Upcoming arena feature event with active pre-sale and live scheduling controls.",
       date,
+      workspaceId: workspace.id,
       venueId: venue.id,
       capacity: venue.capacity,
       ticketPrice: randomInt(30, 90),
@@ -216,6 +244,83 @@ async function main() {
       attendanceRatio: 0,
     });
   }
+
+  await prisma.inventoryRecord.createMany({
+    data: [
+      {
+        workspace_id: workspace.id,
+        product_name: "Arena Merch T-Shirt",
+        record_date: subDays(today, 5),
+        units_in: 120,
+        units_out: 88,
+        remaining_stock: 30,
+        waste_units: 2,
+        revenue: Number((88 * 24).toFixed(2)),
+      },
+      {
+        workspace_id: workspace.id,
+        product_name: "Arena Merch T-Shirt",
+        record_date: subDays(today, 2),
+        units_in: 80,
+        units_out: 61,
+        remaining_stock: 47,
+        waste_units: 2,
+        revenue: Number((61 * 24).toFixed(2)),
+      },
+      {
+        workspace_id: workspace.id,
+        product_name: "Premium Seat Voucher",
+        record_date: subDays(today, 4),
+        units_in: 60,
+        units_out: 43,
+        remaining_stock: 16,
+        waste_units: 1,
+        revenue: Number((43 * 38).toFixed(2)),
+      },
+      {
+        workspace_id: workspace.id,
+        product_name: "Drinks Combo",
+        record_date: subDays(today, 3),
+        units_in: 200,
+        units_out: 126,
+        remaining_stock: 68,
+        waste_units: 6,
+        revenue: Number((126 * 9).toFixed(2)),
+      },
+    ],
+  });
+
+  await prisma.assetRecord.createMany({
+    data: [
+      {
+        workspace_id: workspace.id,
+        asset_name: "Main Hall Booths",
+        record_date: subDays(today, 5),
+        total_assets: 40,
+        booked_assets: 31,
+        idle_assets: 9,
+        revenue: Number((31 * 95).toFixed(2)),
+      },
+      {
+        workspace_id: workspace.id,
+        asset_name: "VIP Rooms",
+        record_date: subDays(today, 3),
+        total_assets: 12,
+        booked_assets: 6,
+        idle_assets: 6,
+        revenue: Number((6 * 280).toFixed(2)),
+      },
+      {
+        workspace_id: workspace.id,
+        asset_name: "Portable Lighting Rigs",
+        record_date: subDays(today, 2),
+        total_assets: 25,
+        booked_assets: 21,
+        idle_assets: 4,
+        revenue: Number((21 * 52).toFixed(2)),
+      },
+    ],
+  });
 }
 
 main()

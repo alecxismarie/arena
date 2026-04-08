@@ -7,7 +7,8 @@ const cloudflareBeaconToken =
 
 export const metadata: Metadata = {
   title: "Signals",
-  description: "Signals is an event performance intelligence platform for live event operations.",
+  description:
+    "Signals is an operations intelligence platform for event performance, inventory performance, and asset utilization.",
   icons: {
     icon: "/favi-signals.png",
     shortcut: "/favi-signals.png",

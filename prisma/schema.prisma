@@ -44,6 +44,8 @@ model Workspace {
   memberships      WorkspaceMembership[]
   sessions         Session[]
   daily_aggregates WorkspaceDailyAggregate[]
+  inventory_records InventoryRecord[]
+  asset_records    AssetRecord[]
   invitation_tokens WorkspaceInvitationToken[]
 }
 
@@ -51,12 +53,12 @@ model Venue {
   id           String     @id @default(cuid())
   name         String
   location     String?
-  workspace_id String?
+  workspace_id String
   capacity     Int
   created_at   DateTime   @default(now())
   updated_at   DateTime   @updatedAt
   events       Event[]
-  workspace    Workspace? @relation(fields: [workspace_id], references: [id], onDelete: SetNull)
+  workspace    Workspace  @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
 
   @@index([workspace_id])
 }
@@ -68,7 +70,7 @@ model Event {
   date               DateTime
   start_time         DateTime
   end_time           DateTime
-  workspace_id       String?
+  workspace_id       String
   venue_id           String?
   capacity           Int
   expected_attendees Int             @default(0)
@@ -79,7 +81,7 @@ model Event {
   status             EventStatus     @default(upcoming)
   created_at         DateTime        @default(now())
   updated_at         DateTime        @updatedAt
-  workspace          Workspace?      @relation(fields: [workspace_id], references: [id], onDelete: SetNull)
+  workspace          Workspace       @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
   venue              Venue?          @relation(fields: [venue_id], references: [id], onDelete: SetNull)
   ticket_sales       TicketSale[]
   attendance_logs    AttendanceLog[]
@@ -145,6 +147,8 @@ model TicketSale {
   quantity    Int
   total_price Decimal  @db.Decimal(12, 2)
   created_at  DateTime @default(now())
+  /// Canonical runtime reporting uses Event.tickets_sold and Event.revenue.
+  /// TicketSale rows are optional raw sale logs retained for future audit/detail use.
   event       Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
 
   @@index([event_id, created_at])
@@ -154,9 +158,47 @@ model AttendanceLog {
   id           String   @id @default(cuid())
   event_id     String
   checkin_time DateTime
+  /// Canonical runtime reporting uses Event.attendance_count.
+  /// AttendanceLog rows are optional raw check-in logs retained for future audit/detail use.
   event        Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
 
   @@index([event_id, checkin_time])
+}
+
+model InventoryRecord {
+  id              String    @id @default(cuid())
+  workspace_id    String
+  product_name    String
+  record_date     DateTime
+  units_in        Int       @default(0)
+  units_out       Int       @default(0)
+  remaining_stock Int       @default(0)
+  waste_units     Int       @default(0)
+  revenue         Decimal?  @db.Decimal(12, 2)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+
+  @@index([workspace_id, record_date])
+  @@index([workspace_id, product_name, record_date])
+  @@index([record_date])
+}
+
+model AssetRecord {
+  id            String    @id @default(cuid())
+  workspace_id  String
+  asset_name    String
+  record_date   DateTime
+  total_assets  Int       @default(0)
+  booked_assets Int       @default(0)
+  idle_assets   Int       @default(0)
+  revenue       Decimal?  @db.Decimal(12, 2)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  workspace     Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+
+  @@index([workspace_id, record_date])
+  @@index([workspace_id, asset_name, record_date])
 }
 
 model EmailVerificationToken {

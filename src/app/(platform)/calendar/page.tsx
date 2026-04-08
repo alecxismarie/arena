@@ -5,14 +5,21 @@ import {
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { StatusPill } from "@/components/ui/status-pill";
 import { getCalendarEvents } from "@/lib/analytics";
+import { getAuthContext } from "@/lib/auth";
 import { formatDateKeyInTimezone, formatInTimezone } from "@/lib/utils";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { addDays, format } from "date-fns";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function CalendarPage() {
+  const context = await getAuthContext();
+  if (!context) {
+    redirect("/");
+  }
+
   const [events, workspace] = await Promise.all([
     getCalendarEvents(),
     getCurrentWorkspace(),

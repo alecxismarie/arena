@@ -243,7 +243,7 @@ export function EventForm({
             <span className="font-medium text-foreground">Status</span>
             <BrandSelect
               name="status"
-              defaultValue={event?.status ?? ""}
+              defaultValue={event?.status ?? "upcoming"}
               options={statusOptions}
               placeholder="Select status"
             />

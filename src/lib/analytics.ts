@@ -1,7 +1,19 @@
-import { EventStatus } from "@prisma/client";
 import { requireAuthContext } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import {
+  mapEventRecord,
+  normalizeEventStatus,
+  toNumber,
+} from "@/lib/analytics/event-mapping";
+import { buildPeriodData } from "@/lib/analytics/period-aggregation";
+import { EventRecord } from "@/lib/analytics/types";
+import {
+  calculateAttendanceComparison,
+  percentageChange,
+  toTrend,
+} from "@/lib/analytics/metrics";
 import { getWorkspaceDailyAggregates } from "@/lib/workspace-daily-aggregates";
+import { eventPerformanceInsightAdapter } from "@/lib/domains/event-performance-adapter";
+import { prisma } from "@/lib/prisma";
 import {
   addMonths,
   eachDayOfInterval,
@@ -16,308 +28,12 @@ import {
   subWeeks,
 } from "date-fns";
 
-type Trend = "up" | "down" | "neutral";
-
-export type EventRecord = {
-  id: string;
-  name: string;
-  description: string | null;
-  date: Date;
-  start_time: Date;
-  end_time: Date;
-  status: EventStatus;
-  capacity: number;
-  expected_attendees: number;
-  ticket_price: number;
-  tickets_sold: number;
-  actual_attendees: number;
-  revenue: number;
-  venue: {
-    id: string;
-    name: string;
-  } | null;
-};
-
 type ReportMetric = {
   label: string;
   value: number;
 };
 
-type HistoricalEventRow = {
-  id: string;
-  name: string;
-  date: Date;
-  end_time: Date;
-  venue_id: string | null;
-  expected_attendees: number;
-  tickets_sold: number;
-  attendance_count: number;
-};
-
-type SimilarityMatchStrategy =
-  | "venue_day_of_week"
-  | "venue_only"
-  | "recent_completed";
-
-type EventIntelligence = {
-  insufficientData: boolean;
-  message: string;
-  sampleSize: number;
-  strategy: SimilarityMatchStrategy | "none";
-  strategyLabel: string;
-  averages: {
-    expected_attendees: number;
-    actual_attendees: number;
-    tickets_sold: number;
-    attendance_rate: number;
-  } | null;
-  turnoutRange: {
-    min: number;
-    max: number;
-    label: string;
-  } | null;
-  expectedComparison: {
-    deltaFromAverage: number;
-    position: "above" | "below" | "aligned";
-  } | null;
-  trend: Array<{
-    id: string;
-    name: string;
-    date: Date;
-    expected_attendees: number;
-    actual_attendees: number;
-    tickets_sold: number;
-    attendance_rate: number;
-  }>;
-};
-
-type EventWithVenue = {
-  id: string;
-  name: string;
-  description: string | null;
-  date: Date;
-  start_time: Date;
-  end_time: Date;
-  status: EventStatus;
-  capacity: number;
-  expected_attendees: number;
-  ticket_price: unknown;
-  tickets_sold: number;
-  attendance_count: number;
-  revenue: unknown;
-  venue?: {
-    id: string;
-    name: string;
-  } | null;
-};
-
-function toNumber(value: unknown) {
-  if (typeof value === "number") return value;
-  if (value === null || value === undefined) return 0;
-  return Number(value);
-}
-
-function percentageChange(current: number, previous: number) {
-  if (previous === 0 && current === 0) return 0;
-  if (previous === 0) return 100;
-  return ((current - previous) / previous) * 100;
-}
-
-function toTrend(change: number): Trend {
-  if (change > 0) return "up";
-  if (change < 0) return "down";
-  return "neutral";
-}
-
-function normalizeEventStatus(endTime: Date, status: EventStatus): EventStatus {
-  if (status === "cancelled") return "cancelled";
-  if (status === "completed") return "completed";
-  if (endTime < new Date()) return "completed";
-  return "upcoming";
-}
-
-function mapEventRecord(event: EventWithVenue): EventRecord {
-  return {
-    id: event.id,
-    name: event.name,
-    description: event.description,
-    date: event.date,
-    start_time: event.start_time,
-    end_time: event.end_time,
-    status: normalizeEventStatus(event.end_time, event.status),
-    capacity: event.capacity,
-    expected_attendees: event.expected_attendees,
-    ticket_price: toNumber(event.ticket_price),
-    tickets_sold: event.tickets_sold,
-    actual_attendees: event.attendance_count,
-    revenue: toNumber(event.revenue),
-    venue: event.venue
-      ? {
-          id: event.venue.id,
-          name: event.venue.name,
-        }
-      : null,
-  };
-}
-
-function calculateAttendanceComparison(expected: number, actual: number) {
-  const variance = actual - expected;
-  const rate = expected > 0 ? actual / expected : 0;
-  return {
-    expected,
-    actual,
-    variance,
-    rate,
-  };
-}
-
-function attendanceRate(actualAttendees: number, expectedAttendees: number) {
-  if (expectedAttendees <= 0) return 0;
-  return actualAttendees / expectedAttendees;
-}
-
-function average(values: number[]) {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function percentile(sortedValues: number[], percentileRank: number) {
-  if (sortedValues.length === 0) return 0;
-  const index = Math.floor((sortedValues.length - 1) * percentileRank);
-  return sortedValues[index];
-}
-
-function calculateTurnoutRange(actuals: number[]) {
-  if (actuals.length === 0) return null;
-  const sorted = actuals.slice().sort((a, b) => a - b);
-
-  if (sorted.length >= 6) {
-    const lower = percentile(sorted, 0.2);
-    const upper = percentile(sorted, 0.8);
-    return {
-      min: Math.round(lower),
-      max: Math.round(upper),
-      label: "Typical attendance range (20th-80th percentile)",
-    };
-  }
-
-  return {
-    min: Math.round(sorted[0]),
-    max: Math.round(sorted[sorted.length - 1]),
-    label: "Attendance range (min-max)",
-  };
-}
-
-function pickComparableEvents(
-  currentEvent: EventRecord,
-  historicalRows: HistoricalEventRow[],
-) {
-  const minimumComparableSize = 3;
-  const currentEventWeekday = currentEvent.date.getDay();
-
-  const sameVenueRows = historicalRows.filter(
-    (row) => row.venue_id === (currentEvent.venue?.id ?? null),
-  );
-
-  const sameVenueDayRows = sameVenueRows.filter(
-    (row) => row.date.getDay() === currentEventWeekday,
-  );
-
-  if (sameVenueDayRows.length >= minimumComparableSize) {
-    return {
-      strategy: "venue_day_of_week" as const,
-      strategyLabel: "venue and day of week",
-      rows: sameVenueDayRows,
-    };
-  }
-
-  if (sameVenueRows.length >= minimumComparableSize) {
-    return {
-      strategy: "venue_only" as const,
-      strategyLabel: "venue",
-      rows: sameVenueRows,
-    };
-  }
-
-  return {
-    strategy: "recent_completed" as const,
-    strategyLabel: "recent completed events",
-    rows: historicalRows.slice(0, 12),
-  };
-}
-
-function buildEventIntelligence(
-  currentEvent: EventRecord,
-  historicalRows: HistoricalEventRow[],
-): EventIntelligence {
-  const picked = pickComparableEvents(currentEvent, historicalRows);
-  const comparable = picked.rows.slice(0, 12);
-
-  if (comparable.length < 2) {
-    return {
-      insufficientData: true,
-      message: "Not enough similar event history yet.",
-      sampleSize: comparable.length,
-      strategy: "none",
-      strategyLabel: "insufficient history",
-      averages: null,
-      turnoutRange: null,
-      expectedComparison: null,
-      trend: [],
-    };
-  }
-
-  const comparableRates = comparable.map((row) =>
-    attendanceRate(row.attendance_count, row.expected_attendees),
-  );
-  const averages = {
-    expected_attendees: average(comparable.map((row) => row.expected_attendees)),
-    actual_attendees: average(comparable.map((row) => row.attendance_count)),
-    tickets_sold: average(comparable.map((row) => row.tickets_sold)),
-    attendance_rate: average(comparableRates),
-  };
-
-  const turnoutRange = calculateTurnoutRange(
-    comparable.map((row) => row.attendance_count),
-  );
-
-  const expectedDelta = currentEvent.expected_attendees - averages.expected_attendees;
-  const expectedComparison =
-    Math.abs(expectedDelta) < 1
-      ? {
-          deltaFromAverage: 0,
-          position: "aligned" as const,
-        }
-      : {
-          deltaFromAverage: expectedDelta,
-          position: expectedDelta > 0 ? ("above" as const) : ("below" as const),
-        };
-
-  const trend = comparable
-    .slice()
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .map((row) => ({
-      id: row.id,
-      name: row.name,
-      date: row.date,
-      expected_attendees: row.expected_attendees,
-      actual_attendees: row.attendance_count,
-      tickets_sold: row.tickets_sold,
-      attendance_rate: attendanceRate(row.attendance_count, row.expected_attendees),
-    }));
-
-  return {
-    insufficientData: false,
-    message: `Based on ${comparable.length} comparable completed events (${picked.strategyLabel}).`,
-    sampleSize: comparable.length,
-    strategy: picked.strategy,
-    strategyLabel: picked.strategyLabel,
-    averages,
-    turnoutRange,
-    expectedComparison,
-    trend,
-  };
-}
+export type { EventRecord };
 
 export async function getDashboardData() {
   const context = await requireAuthContext();
@@ -365,6 +81,8 @@ export async function getDashboardData() {
     }),
   ]);
 
+  // Canonical runtime metrics currently come from Event rollups and
+  // WorkspaceDailyAggregate, not raw TicketSale / AttendanceLog rows.
   const eventTotals = dailyAggregateRows.reduce(
     (acc, row) => ({
       events: acc.events + row.event_count,
@@ -631,7 +349,10 @@ export async function getEventById(eventId: string) {
     take: 120,
   });
 
-  const intelligence = buildEventIntelligence(mapped, historicalRows);
+  const intelligence = eventPerformanceInsightAdapter.computeDeterministicInsights({
+    currentEvent: mapped,
+    historicalRows,
+  });
 
   return {
     event: mapped,
@@ -648,49 +369,6 @@ export async function getEventById(eventId: string) {
     ),
     intelligence,
   };
-}
-
-function buildPeriodData(
-  rows: Array<{ date: Date; tickets_sold: number; revenue: unknown }>,
-  period: "week" | "month",
-) {
-  const now = new Date();
-  const slots =
-    period === "week"
-      ? eachWeekOfInterval({
-          start: startOfWeek(subWeeks(now, 7), { weekStartsOn: 1 }),
-          end: now,
-        })
-      : eachMonthOfInterval({
-          start: subMonths(now, 5),
-          end: now,
-        });
-
-  const map = new Map<string, { tickets: number; revenue: number }>();
-  rows.forEach((row) => {
-    const key =
-      period === "week"
-        ? format(startOfWeek(row.date, { weekStartsOn: 1 }), "yyyy-MM-dd")
-        : format(row.date, "yyyy-MM");
-    const current = map.get(key) ?? { tickets: 0, revenue: 0 };
-    map.set(key, {
-      tickets: current.tickets + row.tickets_sold,
-      revenue: current.revenue + toNumber(row.revenue),
-    });
-  });
-
-  return slots.map((date) => {
-    const key =
-      period === "week"
-        ? format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd")
-        : format(date, "yyyy-MM");
-    const current = map.get(key) ?? { tickets: 0, revenue: 0 };
-    return {
-      label: period === "week" ? format(date, "MMM d") : format(date, "MMM"),
-      tickets: current.tickets,
-      revenue: current.revenue,
-    };
-  });
 }
 
 export async function getReportsData() {

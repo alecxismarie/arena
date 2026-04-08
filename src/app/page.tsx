@@ -53,11 +53,11 @@ export default async function HomePage() {
               />
             </div>
             <h1 className="max-w-[18ch] text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              Understand how your events actually perform.
+              Understand how operations perform across events, inventory, and assets.
             </h1>
             <p className="max-w-xl text-sm text-muted-foreground sm:text-lg">
-              Track turnout, compare expected vs actual, and surface operational
-              insights from past events.
+              Track event turnout, inventory movement, and asset utilization with
+              deterministic performance metrics.
             </p>
           </div>
 

@@ -25,17 +25,34 @@ type EventPayload = {
   venue_name: string | null;
 };
 
+function parseCalendarDateInput(value: string, field: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    throw new Error(`Invalid ${field}`);
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(year, month - 1, day, 0, 0, 0, 0);
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    throw new Error(`Invalid ${field}`);
+  }
+
+  return parsed;
+}
+
 function parseDateInput(value: FormDataEntryValue | null, field: string) {
   if (typeof value !== "string" || !value) {
     throw new Error(`${field} is required`);
   }
 
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new Error(`Invalid ${field}`);
-  }
-
-  return parsed;
+  return parseCalendarDateInput(value, field);
 }
 
 function parseTime(value: FormDataEntryValue | null, field: string) {
@@ -81,11 +98,27 @@ function parseNonNegativeNumber(
   return parsed;
 }
 
-function parseStatus(value: FormDataEntryValue | null) {
-  if (value === "upcoming" || value === "completed" || value === "cancelled") {
-    return value;
+function parseStatus(
+  value: FormDataEntryValue | null,
+  options?: {
+    defaultStatus?: EventStatus;
+  },
+) {
+  const defaultStatus = options?.defaultStatus ?? "upcoming";
+  if (value === null || value === "") {
+    return defaultStatus;
   }
-  throw new Error("Status is required");
+
+  if (value === "upcoming" || value === "completed" || value === "cancelled") {
+    return value as EventStatus;
+  }
+
+  throw new Error("Invalid status");
+}
+
+function deriveCanonicalRevenue(ticketsSold: number, ticketPrice: number) {
+  // Runtime reporting uses Event-level rollups as canonical values.
+  return Number((ticketsSold * ticketPrice).toFixed(2));
 }
 
 function buildEventPayload(
@@ -93,6 +126,7 @@ function buildEventPayload(
   options: {
     canEditFinancial: boolean;
     existingTicketPrice?: number;
+    defaultStatus?: EventStatus;
   },
 ): EventPayload {
   const name = String(formData.get("name") ?? "").trim();
@@ -144,7 +178,15 @@ function buildEventPayload(
     throw new Error("Tickets sold cannot exceed capacity");
   }
 
-  const revenue = Number((tickets_sold * ticket_price).toFixed(2));
+  if (actual_attendees > capacity) {
+    throw new Error("Actual attendees cannot exceed capacity");
+  }
+
+  if (actual_attendees > tickets_sold) {
+    throw new Error("Actual attendees cannot exceed tickets sold");
+  }
+
+  const revenue = deriveCanonicalRevenue(tickets_sold, ticket_price);
   const venue_id = String(formData.get("venue_id") ?? "").trim() || null;
   const venue_name = String(formData.get("venue_name") ?? "").trim() || null;
 
@@ -161,7 +203,9 @@ function buildEventPayload(
     tickets_sold,
     attendance_count: actual_attendees,
     revenue,
-    status: parseStatus(formData.get("status")),
+    status: parseStatus(formData.get("status"), {
+      defaultStatus: options.defaultStatus,
+    }),
     venue_name,
   };
 }
@@ -236,6 +280,7 @@ export async function createEventAction(formData: FormData) {
 
   const payload = buildEventPayload(formData, {
     canEditFinancial: context.role === "owner",
+    defaultStatus: "upcoming",
   });
   const eventData = { ...payload };
   Reflect.deleteProperty(eventData, "venue_name");
@@ -272,26 +317,24 @@ export async function updateEventAction(formData: FormData) {
     throw new Error("Event id is required");
   }
 
-  let existingTicketPrice: number | undefined;
-  if (context.role !== "owner") {
-    const existingEvent = await prisma.event.findFirst({
-      where: {
-        id: eventId,
-        workspace_id: context.workspaceId,
-      },
-      select: {
-        ticket_price: true,
-      },
-    });
-    if (!existingEvent) {
-      throw new Error("Event not found");
-    }
-    existingTicketPrice = Number(existingEvent.ticket_price);
+  const existingEvent = await prisma.event.findFirst({
+    where: {
+      id: eventId,
+      workspace_id: context.workspaceId,
+    },
+    select: {
+      ticket_price: true,
+      status: true,
+    },
+  });
+  if (!existingEvent) {
+    throw new Error("Event not found");
   }
 
   const payload = buildEventPayload(formData, {
     canEditFinancial: context.role === "owner",
-    existingTicketPrice,
+    existingTicketPrice: Number(existingEvent.ticket_price),
+    defaultStatus: existingEvent.status,
   });
   const eventData = { ...payload };
   Reflect.deleteProperty(eventData, "venue_name");
@@ -344,10 +387,7 @@ export async function rescheduleEventAction(formData: FormData) {
     throw new Error("Event not found");
   }
 
-  const nextDate = new Date(`${newDateRaw}T00:00:00`);
-  if (Number.isNaN(nextDate.getTime())) {
-    throw new Error("Invalid new date");
-  }
+  const nextDate = parseCalendarDateInput(newDateRaw, "new date");
 
   const nextStart = new Date(nextDate);
   nextStart.setHours(
