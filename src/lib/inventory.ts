@@ -42,9 +42,14 @@ function mapDailyReport(record: {
   product_id: string;
   report_date: Date;
   beginning_stock: number;
+  opening_stock_recorded_by: string | null;
+  opening_stock_recorded_at: Date | null;
   stock_added: number;
   ending_stock: number;
   waste_units: number;
+  closing_stock_recorded_by: string | null;
+  closing_stock_recorded_at: Date | null;
+  is_finalized: boolean;
   units_sold: number;
   revenue: unknown;
   cogs: unknown;
@@ -61,9 +66,14 @@ function mapDailyReport(record: {
     product_name: record.product.name,
     report_date: record.report_date,
     beginning_stock: record.beginning_stock,
+    opening_stock_recorded_by: record.opening_stock_recorded_by,
+    opening_stock_recorded_at: record.opening_stock_recorded_at,
     stock_added: record.stock_added,
     ending_stock: record.ending_stock,
     waste_units: record.waste_units,
+    closing_stock_recorded_by: record.closing_stock_recorded_by,
+    closing_stock_recorded_at: record.closing_stock_recorded_at,
+    is_finalized: record.is_finalized,
     units_sold: record.units_sold,
     revenue: toNumber(record.revenue),
     cogs: toNumber(record.cogs),
@@ -159,9 +169,14 @@ async function fetchDailyReportsForWorkspace(
       product_id: true,
       report_date: true,
       beginning_stock: true,
+      opening_stock_recorded_by: true,
+      opening_stock_recorded_at: true,
       stock_added: true,
       ending_stock: true,
       waste_units: true,
+      closing_stock_recorded_by: true,
+      closing_stock_recorded_at: true,
+      is_finalized: true,
       units_sold: true,
       revenue: true,
       cogs: true,
@@ -192,6 +207,7 @@ async function fetchLookbackRevenueRows(
   const rows = await prisma.dailyProductReport.findMany({
     where: {
       workspace_id: workspaceId,
+      is_finalized: true,
       report_date: {
         gte: lookbackStart,
         lt: selectedDateRange.end,
@@ -308,16 +324,20 @@ type CreateDailyInventoryReportInput = {
   workspaceId: string;
   productId: string;
   reportDate: Date;
-  beginningStock: number;
-  stockAdded: number;
-  endingStock: number;
-  wasteUnits: number;
+  entryStage: "opening" | "closing";
+  staffName: string;
+  beginningStock?: number;
+  stockAdded?: number;
+  endingStock?: number;
+  wasteUnits?: number;
 };
 
 export async function createDailyInventoryReport({
   workspaceId,
   productId,
   reportDate,
+  entryStage,
+  staffName,
   beginningStock,
   stockAdded,
   endingStock,
@@ -339,38 +359,138 @@ export async function createDailyInventoryReport({
   if (!product) {
     throw new Error("Selected product is not available in this workspace");
   }
-  if (!product.is_active) {
-    throw new Error("Selected product is inactive");
+  if (entryStage === "opening" && !product.is_active) {
+    throw new Error("Selected product is sold out. Mark it active before logging opening stock.");
   }
 
+  const now = new Date();
+
+  if (entryStage === "opening") {
+    if (
+      beginningStock === undefined ||
+      !Number.isInteger(beginningStock) ||
+      beginningStock < 0
+    ) {
+      throw new Error("Beginning stock must be a whole number and at least 0");
+    }
+    const openingStock: number = beginningStock;
+
+    const existingForDate = await prisma.dailyProductReport.findFirst({
+      where: {
+        workspace_id: workspaceId,
+        product_id: product.id,
+        report_date: reportDate,
+      },
+      select: {
+        id: true,
+        is_finalized: true,
+      },
+    });
+
+    if (existingForDate?.is_finalized) {
+      throw new Error(
+        "Closing inventory is already finalized for this product/date.",
+      );
+    }
+
+    if (existingForDate) {
+      return prisma.dailyProductReport.update({
+        where: {
+          id: existingForDate.id,
+        },
+        data: {
+          beginning_stock: openingStock,
+          opening_stock_recorded_by: staffName,
+          opening_stock_recorded_at: now,
+          is_finalized: false,
+        },
+      });
+    }
+
+    return prisma.dailyProductReport.create({
+      data: {
+        workspace_id: workspaceId,
+        product_id: product.id,
+        report_date: reportDate,
+        beginning_stock: openingStock,
+        opening_stock_recorded_by: staffName,
+        opening_stock_recorded_at: now,
+        stock_added: 0,
+        ending_stock: openingStock,
+        waste_units: 0,
+        units_sold: 0,
+        revenue: 0,
+        cogs: 0,
+        gross_profit: 0,
+        is_finalized: false,
+      },
+    });
+  }
+
+  const existing = await prisma.dailyProductReport.findFirst({
+    where: {
+      workspace_id: workspaceId,
+      product_id: product.id,
+      report_date: reportDate,
+    },
+    select: {
+      id: true,
+      beginning_stock: true,
+      opening_stock_recorded_at: true,
+    },
+  });
+
+  if (!existing) {
+    throw new Error(
+      "Opening inventory is not recorded yet for this product/date. Save opening stock first.",
+    );
+  }
+  if (!existing.opening_stock_recorded_at) {
+    throw new Error("Opening inventory timestamp is missing. Save opening stock again.");
+  }
+  if (stockAdded === undefined || !Number.isInteger(stockAdded) || stockAdded < 0) {
+    throw new Error("Stock added must be a whole number and at least 0");
+  }
+  if (endingStock === undefined || !Number.isInteger(endingStock) || endingStock < 0) {
+    throw new Error("Ending stock must be a whole number and at least 0");
+  }
+  if (wasteUnits === undefined || !Number.isInteger(wasteUnits) || wasteUnits < 0) {
+    throw new Error("Waste units must be a whole number and at least 0");
+  }
+  const closingStockAdded: number = stockAdded;
+  const closingEndingStock: number = endingStock;
+  const closingWasteUnits: number = wasteUnits;
+
   const computed = computeDailyInventoryFinancials({
-    beginningStock,
-    stockAdded,
-    endingStock,
-    wasteUnits,
+    beginningStock: existing.beginning_stock,
+    stockAdded: closingStockAdded,
+    endingStock: closingEndingStock,
+    wasteUnits: closingWasteUnits,
     sellingPrice: Number(product.selling_price),
     costPrice: Number(product.cost_price),
   });
 
   if (computed.unitsSold < 0) {
     throw new Error(
-      "Computed units sold cannot be negative. Check beginning stock, stock added, ending stock, and waste.",
+      "Computed units sold cannot be negative. Check opening stock, stock added, ending stock, and waste.",
     );
   }
 
-  return prisma.dailyProductReport.create({
+  return prisma.dailyProductReport.update({
+    where: {
+      id: existing.id,
+    },
     data: {
-      workspace_id: workspaceId,
-      product_id: product.id,
-      report_date: reportDate,
-      beginning_stock: beginningStock,
-      stock_added: stockAdded,
-      ending_stock: endingStock,
-      waste_units: wasteUnits,
+      stock_added: closingStockAdded,
+      ending_stock: closingEndingStock,
+      waste_units: closingWasteUnits,
       units_sold: computed.unitsSold,
       revenue: computed.revenue,
       cogs: computed.cogs,
       gross_profit: computed.grossProfit,
+      closing_stock_recorded_by: staffName,
+      closing_stock_recorded_at: now,
+      is_finalized: true,
     },
   });
 }

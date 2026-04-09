@@ -57,6 +57,7 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
     INITIAL_DAILY_REPORT_FORM_STATE,
   );
 
+  const [entryStage, setEntryStage] = useState<"opening" | "closing">("opening");
   const [beginningStock, setBeginningStock] = useState("0");
   const [stockAdded, setStockAdded] = useState("0");
   const [endingStock, setEndingStock] = useState("0");
@@ -75,8 +76,8 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
           Add daily product report
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Submit daily closing stock by product. Signals computes units sold, revenue, and gross
-          profit on the server and adds this data to the daily business summary.
+          Record opening inventory in the morning, then close inventory in the evening.
+          Computed sales and profit are finalized only after the closing step.
         </p>
       </header>
 
@@ -92,7 +93,22 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
         </div>
       ) : (
         <form action={formAction} className="space-y-5">
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <label className="space-y-2 text-sm">
+              <span className="font-medium text-foreground">Entry stage</span>
+              <select
+                name="entry_stage"
+                value={entryStage}
+                onChange={(event) =>
+                  setEntryStage(event.target.value === "closing" ? "closing" : "opening")
+                }
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+              >
+                <option value="opening">Opening (morning count)</option>
+                <option value="closing">Closing (end-of-day finalize)</option>
+              </select>
+            </label>
+
             <label className="space-y-2 text-sm">
               <span className="font-medium text-foreground">Product</span>
               <select
@@ -125,64 +141,88 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
             </label>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <label className="space-y-2 text-sm">
-              <span className="font-medium text-foreground">Beginning stock</span>
-              <input
-                type="number"
-                min={0}
-                name="beginning_stock"
-                defaultValue={0}
-                required
-                onChange={(event) => setBeginningStock(event.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
-              />
-            </label>
+          <label className="block space-y-2 text-sm">
+            <span className="font-medium text-foreground">Staff name</span>
+            <input
+              name="staff_name"
+              placeholder="Who is recording this entry?"
+              required
+              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+            />
+          </label>
 
-            <label className="space-y-2 text-sm">
-              <span className="font-medium text-foreground">Stock added</span>
-              <input
-                type="number"
-                min={0}
-                name="stock_added"
-                defaultValue={0}
-                required
-                onChange={(event) => setStockAdded(event.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
-              />
-            </label>
+          {entryStage === "opening" ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm">
+                <span className="font-medium text-foreground">Beginning stock</span>
+                <input
+                  type="number"
+                  min={0}
+                  name="beginning_stock"
+                  defaultValue={0}
+                  required
+                  onChange={(event) => setBeginningStock(event.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+                />
+              </label>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="space-y-2 text-sm">
+                <span className="font-medium text-foreground">Stock added</span>
+                <input
+                  type="number"
+                  min={0}
+                  name="stock_added"
+                  defaultValue={0}
+                  required
+                  onChange={(event) => setStockAdded(event.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+                />
+              </label>
 
-            <label className="space-y-2 text-sm">
-              <span className="font-medium text-foreground">Ending stock</span>
-              <input
-                type="number"
-                min={0}
-                name="ending_stock"
-                defaultValue={0}
-                required
-                onChange={(event) => setEndingStock(event.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
-              />
-            </label>
+              <label className="space-y-2 text-sm">
+                <span className="font-medium text-foreground">Ending stock</span>
+                <input
+                  type="number"
+                  min={0}
+                  name="ending_stock"
+                  defaultValue={0}
+                  required
+                  onChange={(event) => setEndingStock(event.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+                />
+              </label>
 
-            <label className="space-y-2 text-sm">
-              <span className="font-medium text-foreground">Waste units</span>
-              <input
-                type="number"
-                min={0}
-                name="waste_units"
-                defaultValue={0}
-                onChange={(event) => setWasteUnits(event.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
-              />
-            </label>
-          </div>
+              <label className="space-y-2 text-sm">
+                <span className="font-medium text-foreground">Waste units</span>
+                <input
+                  type="number"
+                  min={0}
+                  name="waste_units"
+                  defaultValue={0}
+                  onChange={(event) => setWasteUnits(event.target.value)}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+                />
+              </label>
+            </div>
+          )}
 
           <div className="rounded-xl border border-border/70 bg-background/70 px-4 py-3 text-sm text-muted-foreground">
-            Units sold formula: beginning stock + stock added - ending stock - waste units.
-            <span className="mt-1 block font-medium text-foreground">
-              Preview units sold: {unitsSoldPreview === null ? "--" : unitsSoldPreview}
-            </span>
+            {entryStage === "opening" ? (
+              <span className="block font-medium text-foreground">
+                Opening saved: {beginningStock} units. Sales are not computed yet.
+              </span>
+            ) : (
+              <>
+                Closing finalizes computed sales with formula:
+                opening stock + stock added - ending stock - waste units.
+                <span className="mt-1 block font-medium text-foreground">
+                  Preview delta (without opening reference):{" "}
+                  {unitsSoldPreview === null ? "--" : unitsSoldPreview}
+                </span>
+              </>
+            )}
           </div>
 
           {state.error ? (
@@ -197,7 +237,11 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
               disabled={isPending}
               className="btn-primary rounded-xl px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isPending ? "Saving..." : "Save daily report"}
+              {isPending
+                ? "Saving..."
+                : entryStage === "opening"
+                  ? "Save opening inventory"
+                  : "Finalize closing inventory"}
             </button>
           </div>
         </form>

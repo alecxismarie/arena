@@ -269,11 +269,12 @@ export const inventoryPerformanceInsightAdapter: DeterministicInsightAdapter<
 > = {
   domain: "inventory_performance",
   computeDeterministicInsights: ({ products, reports }) => {
-    const metrics = buildMetrics(products, reports);
+    const finalizedReports = reports.filter((report) => report.is_finalized);
+    const metrics = buildMetrics(products, finalizedReports);
     return {
-      insufficientData: products.length === 0 || reports.length === 0,
+      insufficientData: products.length === 0 || finalizedReports.length === 0,
       metrics,
-      insights: buildInsights(products, reports, metrics),
+      insights: buildInsights(products, finalizedReports, metrics),
     };
   },
 };

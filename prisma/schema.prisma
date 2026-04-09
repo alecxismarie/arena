@@ -209,9 +209,14 @@ model DailyProductReport {
   product_id      String
   report_date     DateTime
   beginning_stock Int
+  opening_stock_recorded_by String?
+  opening_stock_recorded_at DateTime?
   stock_added     Int
   ending_stock    Int
   waste_units     Int       @default(0)
+  closing_stock_recorded_by String?
+  closing_stock_recorded_at DateTime?
+  is_finalized    Boolean   @default(false)
   units_sold      Int
   revenue         Decimal   @db.Decimal(12, 2)
   cogs            Decimal   @db.Decimal(12, 2)
@@ -224,6 +229,7 @@ model DailyProductReport {
   @@unique([workspace_id, product_id, report_date])
   @@index([workspace_id, report_date])
   @@index([workspace_id, product_id, report_date])
+  @@index([workspace_id, report_date, is_finalized])
 }
 
 model AssetRecord {

@@ -45,6 +45,20 @@ function dateFromKey(dateKey: string) {
   return new Date(`${dateKey}T00:00:00.000Z`);
 }
 
+function formatAuditEntry(
+  actor: string | null,
+  timestamp: Date | null,
+  timezone?: string,
+) {
+  if (!actor || !timestamp) return "--";
+  return `${actor} (${formatInTimezone(timestamp, timezone, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })})`;
+}
+
 const FINANCIAL_INSIGHT_KEYS = new Set(["strong_sales_day", "weak_sales_day", "healthy_gross_margin", "margin_pressure"]);
 
 export default async function InventoryPage({ searchParams }: InventoryPageProps) {
@@ -180,7 +194,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           </p>
         </article>
         <article className="rounded-2xl border border-border/60 bg-card p-4">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Reports Logged</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Closed Reports</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
             {formatNumber(summary.metrics.reportCount)}
           </p>
@@ -336,9 +350,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           <div>
             <h2 className="text-base font-semibold text-foreground">Daily product reports</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {summary.metrics.reportCount === 0
-                ? "No reports yet for the selected date."
-                : "System-computed sales and profitability from submitted daily reports."}
+              {summary.reports.length === 0
+                ? "No inventory entries yet for the selected date."
+                : "Opening and closing logs for the selected date. Sales metrics finalize after closing."}
             </p>
           </div>
           <Link
@@ -361,6 +375,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                 <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-3 py-2">Date</th>
                   <th className="px-3 py-2">Product</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Opening Logged</th>
+                  <th className="px-3 py-2">Closing Logged</th>
                   <th className="px-3 py-2">Beginning</th>
                   <th className="px-3 py-2">Added</th>
                   <th className="px-3 py-2">Ending</th>
@@ -382,20 +399,63 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                       })}
                     </td>
                     <td className="px-3 py-3 font-medium">{row.product_name}</td>
+                    <td className="px-3 py-3">
+                      <span
+                        className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-medium ${
+                          row.is_finalized
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-amber-200 bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        {row.is_finalized ? "Finalized" : "Opening logged"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-muted-foreground">
+                      {formatAuditEntry(
+                        row.opening_stock_recorded_by,
+                        row.opening_stock_recorded_at,
+                        workspace?.timezone,
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-muted-foreground">
+                      {formatAuditEntry(
+                        row.closing_stock_recorded_by,
+                        row.closing_stock_recorded_at,
+                        workspace?.timezone,
+                      )}
+                    </td>
                     <td className="px-3 py-3">{formatNumber(row.beginning_stock)}</td>
-                    <td className="px-3 py-3">{formatNumber(row.stock_added)}</td>
-                    <td className="px-3 py-3">{formatNumber(row.ending_stock)}</td>
-                    <td className="px-3 py-3">{formatNumber(row.waste_units)}</td>
-                    <td className="px-3 py-3">{formatNumber(row.units_sold)}</td>
+                    <td className="px-3 py-3">
+                      {row.is_finalized ? formatNumber(row.stock_added) : "--"}
+                    </td>
+                    <td className="px-3 py-3">
+                      {row.is_finalized ? formatNumber(row.ending_stock) : "--"}
+                    </td>
+                    <td className="px-3 py-3">
+                      {row.is_finalized ? formatNumber(row.waste_units) : "--"}
+                    </td>
+                    <td className="px-3 py-3">
+                      {row.is_finalized ? formatNumber(row.units_sold) : "--"}
+                    </td>
                     {canViewFinancial ? (
-                      <td className="px-3 py-3">{formatCurrency(row.revenue, workspace?.currency)}</td>
+                      <td className="px-3 py-3">
+                        {row.is_finalized
+                          ? formatCurrency(row.revenue, workspace?.currency)
+                          : "--"}
+                      </td>
                     ) : null}
                     {canViewFinancial ? (
-                      <td className="px-3 py-3">{formatCurrency(row.cogs, workspace?.currency)}</td>
+                      <td className="px-3 py-3">
+                        {row.is_finalized
+                          ? formatCurrency(row.cogs, workspace?.currency)
+                          : "--"}
+                      </td>
                     ) : null}
                     {canViewFinancial ? (
                       <td className="rounded-r-xl px-3 py-3">
-                        {formatCurrency(row.gross_profit, workspace?.currency)}
+                        {row.is_finalized
+                          ? formatCurrency(row.gross_profit, workspace?.currency)
+                          : "--"}
                       </td>
                     ) : null}
                   </tr>

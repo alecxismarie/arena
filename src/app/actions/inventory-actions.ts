@@ -7,6 +7,7 @@ import {
   createDailyInventoryReport,
   createInventoryProduct,
 } from "@/lib/inventory";
+import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -102,6 +103,32 @@ function parseProductId(value: FormDataEntryValue | null) {
   return productId;
 }
 
+function parseStaffName(value: FormDataEntryValue | null) {
+  const staffName = String(value ?? "").trim();
+  if (!staffName) {
+    throw new Error("Staff name is required");
+  }
+  if (staffName.length > 80) {
+    throw new Error("Staff name must be 80 characters or less");
+  }
+  return staffName;
+}
+
+function parseEntryStage(value: FormDataEntryValue | null) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized === "opening") {
+    return "opening" as const;
+  }
+  if (normalized === "closing") {
+    return "closing" as const;
+  }
+
+  throw new Error("Invalid entry stage");
+}
+
 function safeErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -162,23 +189,37 @@ export async function createDailyProductReportAction(
   assertCanOperateInventory(context);
 
   try {
+    const entryStage = parseEntryStage(formData.get("entry_stage"));
+    const staffName = parseStaffName(formData.get("staff_name"));
     const productId = parseProductId(formData.get("product_id"));
     const reportDate = parseDateInput(formData.get("report_date"), "report date");
-    const beginningStock = parseNonNegativeNumber(
-      formData.get("beginning_stock"),
-      "Beginning stock",
-    );
-    const stockAdded = parseNonNegativeNumber(formData.get("stock_added"), "Stock added");
-    const endingStock = parseNonNegativeNumber(formData.get("ending_stock"), "Ending stock");
-    const wasteUnits = parseNonNegativeNumber(formData.get("waste_units"), "Waste units", {
-      required: false,
-      defaultValue: 0,
-    });
+
+    const beginningStock =
+      entryStage === "opening"
+        ? parseNonNegativeNumber(formData.get("beginning_stock"), "Beginning stock")
+        : undefined;
+    const stockAdded =
+      entryStage === "closing"
+        ? parseNonNegativeNumber(formData.get("stock_added"), "Stock added")
+        : undefined;
+    const endingStock =
+      entryStage === "closing"
+        ? parseNonNegativeNumber(formData.get("ending_stock"), "Ending stock")
+        : undefined;
+    const wasteUnits =
+      entryStage === "closing"
+        ? parseNonNegativeNumber(formData.get("waste_units"), "Waste units", {
+            required: false,
+            defaultValue: 0,
+          })
+        : undefined;
 
     await createDailyInventoryReport({
       workspaceId: context.workspaceId,
       productId,
       reportDate,
+      entryStage,
+      staffName,
       beginningStock,
       stockAdded,
       endingStock,
@@ -202,4 +243,42 @@ export async function createDailyProductReportAction(
   revalidatePath("/inventory");
   revalidatePath("/inventory/reports/new");
   redirect("/inventory");
+}
+
+function parseProductStatus(value: FormDataEntryValue | null) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (normalized === "active") {
+    return true;
+  }
+  if (normalized === "sold_out") {
+    return false;
+  }
+
+  throw new Error("Invalid product status");
+}
+
+export async function setProductStatusAction(formData: FormData) {
+  const context = await requireAuthContext();
+  assertCanOperateInventory(context);
+
+  const productId = parseProductId(formData.get("product_id"));
+  const nextIsActive = parseProductStatus(formData.get("next_status"));
+
+  await prisma.product.updateMany({
+    where: {
+      id: productId,
+      workspace_id: context.workspaceId,
+    },
+    data: {
+      is_active: nextIsActive,
+    },
+  });
+
+  revalidatePath("/inventory");
+  revalidatePath("/inventory/products");
+  revalidatePath("/inventory/reports/new");
+  redirect("/inventory/products");
 }

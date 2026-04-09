@@ -15,9 +15,14 @@ export type DailyProductReportItem = {
   product_name: string;
   report_date: Date;
   beginning_stock: number;
+  opening_stock_recorded_by: string | null;
+  opening_stock_recorded_at: Date | null;
   stock_added: number;
   ending_stock: number;
   waste_units: number;
+  closing_stock_recorded_by: string | null;
+  closing_stock_recorded_at: Date | null;
+  is_finalized: boolean;
   units_sold: number;
   revenue: number;
   cogs: number;

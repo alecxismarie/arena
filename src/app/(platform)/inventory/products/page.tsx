@@ -1,3 +1,4 @@
+import { setProductStatusAction } from "@/app/actions/inventory-actions";
 import { getAuthContext } from "@/lib/auth";
 import { getInventoryProducts } from "@/lib/inventory";
 import { formatCurrency, formatInTimezone } from "@/lib/utils";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 function statusClass(isActive: boolean) {
   return isActive
     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : "border-border bg-background text-muted-foreground";
+    : "border-amber-200 bg-amber-50 text-amber-700";
 }
 
 export default async function InventoryProductsPage() {
@@ -31,7 +32,7 @@ export default async function InventoryProductsPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">Inventory products</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Product pricing and status used by daily business summary reporting.
+            Product catalog with reusable pricing. Mark products sold out and reactivate later.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -86,6 +87,7 @@ export default async function InventoryProductsPage() {
                   {canViewFinancial ? <th className="px-3 py-2">Cost price</th> : null}
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Updated</th>
+                  <th className="px-3 py-2">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -109,15 +111,31 @@ export default async function InventoryProductsPage() {
                       <span
                         className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-medium ${statusClass(product.is_active)}`}
                       >
-                        {product.is_active ? "Active" : "Inactive"}
+                        {product.is_active ? "Active" : "Sold out"}
                       </span>
                     </td>
-                    <td className="rounded-r-xl px-3 py-3 text-muted-foreground">
+                    <td className="px-3 py-3 text-muted-foreground">
                       {formatInTimezone(product.updated_at, workspace?.timezone, {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
                       })}
+                    </td>
+                    <td className="rounded-r-xl px-3 py-3">
+                      <form action={setProductStatusAction}>
+                        <input type="hidden" name="product_id" value={product.id} />
+                        <input
+                          type="hidden"
+                          name="next_status"
+                          value={product.is_active ? "sold_out" : "active"}
+                        />
+                        <button
+                          type="submit"
+                          className="btn-secondary rounded-lg px-2.5 py-1.5 text-xs font-medium"
+                        >
+                          {product.is_active ? "Mark sold out" : "Mark active"}
+                        </button>
+                      </form>
                     </td>
                   </tr>
                 ))}

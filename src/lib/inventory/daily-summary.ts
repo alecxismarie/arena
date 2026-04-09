@@ -32,7 +32,9 @@ type ProductAggregate = {
 };
 
 function buildMetrics(reports: DailyProductReportItem[]): DailyBusinessSummaryMetrics {
-  const totals = reports.reduce(
+  const finalizedReports = reports.filter((report) => report.is_finalized);
+
+  const totals = finalizedReports.reduce(
     (acc, report) => ({
       unitsSold: acc.unitsSold + report.units_sold,
       revenue: acc.revenue + report.revenue,
@@ -47,7 +49,7 @@ function buildMetrics(reports: DailyProductReportItem[]): DailyBusinessSummaryMe
     },
   );
 
-  const byProduct = reports.reduce((acc, report) => {
+  const byProduct = finalizedReports.reduce((acc, report) => {
     const current = acc.get(report.product_id) ?? {
       productId: report.product_id,
       productName: report.product_name,
@@ -84,7 +86,7 @@ function buildMetrics(reports: DailyProductReportItem[]): DailyBusinessSummaryMe
       value: roundTo(entry.grossProfit, 2),
     }));
 
-  const lowStockProducts = reports
+  const lowStockProducts = finalizedReports
     .filter((report) => report.ending_stock <= LOW_STOCK_THRESHOLD)
     .sort((a, b) => a.ending_stock - b.ending_stock)
     .slice(0, 5)
@@ -106,7 +108,7 @@ function buildMetrics(reports: DailyProductReportItem[]): DailyBusinessSummaryMe
     }));
 
   return {
-    reportCount: reports.length,
+    reportCount: finalizedReports.length,
     totalUnitsSold: totals.unitsSold,
     totalRevenue: roundTo(totals.revenue, 2),
     totalCogs: roundTo(totals.cogs, 2),
@@ -137,6 +139,8 @@ function buildInsights({
   lookbackRevenueDays: RevenueDay[];
   reports: DailyProductReportItem[];
 }): InventoryInsight[] {
+  const finalizedReports = reports.filter((report) => report.is_finalized);
+
   if (productCount === 0) {
     return [
       {
@@ -148,6 +152,17 @@ function buildInsights({
   }
 
   if (metrics.reportCount === 0) {
+    if (reports.length > 0 && finalizedReports.length === 0) {
+      return [
+        {
+          key: "opening_logged_waiting_for_close",
+          level: "neutral",
+          message:
+            "Opening inventory is logged. Submit closing inventory to finalize sales and profit.",
+        },
+      ];
+    }
+
     return [
       {
         key: "no_reports_submitted",
@@ -196,8 +211,8 @@ function buildInsights({
     }
   }
 
-  const totalWaste = reports.reduce((sum, report) => sum + report.waste_units, 0);
-  const totalAvailable = reports.reduce(
+  const totalWaste = finalizedReports.reduce((sum, report) => sum + report.waste_units, 0);
+  const totalAvailable = finalizedReports.reduce(
     (sum, report) => sum + report.beginning_stock + report.stock_added,
     0,
   );
