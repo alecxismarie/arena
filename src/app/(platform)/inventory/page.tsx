@@ -194,7 +194,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
       </header>
 
       <section
-        className={`grid gap-4 ${canViewFinancial ? "sm:grid-cols-2 xl:grid-cols-6" : "sm:grid-cols-2 xl:grid-cols-4"}`}
+        className={`grid gap-4 ${canViewFinancial ? "sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6" : "sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4"}`}
       >
         <article className="rounded-2xl border border-border/60 bg-card p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Units Sold</p>
@@ -378,109 +378,128 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
             today&apos;s business summary.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-separate border-spacing-y-2 text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Product</th>
-                  <th className="px-3 py-2">Yield</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Opening Logged</th>
-                  <th className="px-3 py-2">Closing Logged</th>
-                  <th className="px-3 py-2">Beginning</th>
-                  <th className="px-3 py-2">Added</th>
-                  <th className="px-3 py-2">Ending</th>
-                  <th className="px-3 py-2">Waste</th>
-                  <th className="px-3 py-2">Units Sold</th>
-                  <th className="px-3 py-2">Recipe Sold</th>
-                  {canViewFinancial ? <th className="px-3 py-2">Revenue</th> : null}
-                  {canViewFinancial ? <th className="px-3 py-2">COGS</th> : null}
-                  {canViewFinancial ? <th className="px-3 py-2">Gross Profit</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {summary.reports.map((row) => (
-                  <tr key={row.id} className="rounded-xl bg-muted/35 text-foreground">
-                    <td className="rounded-l-xl px-3 py-3 text-muted-foreground">
+          <div className="space-y-3">
+            {summary.reports.map((row) => (
+              <article
+                key={row.id}
+                className="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-foreground">{row.product_name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {formatInTimezone(row.report_date, workspace?.timezone, {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
                       })}
-                    </td>
-                    <td className="px-3 py-3 font-medium">{row.product_name}</td>
-                    <td className="px-3 py-3 text-muted-foreground">
+                      {" · "}
                       {formatNumber(row.product_yield_per_recipe)} pcs/recipe
-                    </td>
-                    <td className="px-3 py-3">
-                      <span
-                        className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-medium ${
-                          row.is_finalized
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-amber-200 bg-amber-50 text-amber-700"
-                        }`}
-                      >
-                        {row.is_finalized ? "Finalized" : "Opening logged"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-muted-foreground">
+                    </p>
+                  </div>
+                  <span
+                    className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-medium ${
+                      row.is_finalized
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-amber-200 bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {row.is_finalized ? "Finalized" : "Opening logged"}
+                  </span>
+                </div>
+
+                <dl
+                  className={`mt-4 grid gap-3 ${canViewFinancial ? "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" : "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"}`}
+                >
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">Opening Logged</dt>
+                    <dd className="mt-1 text-foreground">
                       {formatAuditEntry(
                         row.opening_stock_recorded_by,
                         row.opening_stock_recorded_at,
                         workspace?.timezone,
                       )}
-                    </td>
-                    <td className="px-3 py-3 text-muted-foreground">
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">Closing Logged</dt>
+                    <dd className="mt-1 text-foreground">
                       {formatAuditEntry(
                         row.closing_stock_recorded_by,
                         row.closing_stock_recorded_at,
                         workspace?.timezone,
                       )}
-                    </td>
-                    <td className="px-3 py-3">{formatNumber(row.beginning_stock)}</td>
-                    <td className="px-3 py-3">
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">Beginning</dt>
+                    <dd className="mt-1 text-foreground">{formatNumber(row.beginning_stock)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">Added</dt>
+                    <dd className="mt-1 text-foreground">
                       {row.is_finalized ? formatNumber(row.stock_added) : "--"}
-                    </td>
-                    <td className="px-3 py-3">
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">Ending</dt>
+                    <dd className="mt-1 text-foreground">
                       {row.is_finalized ? formatNumber(row.ending_stock) : "--"}
-                    </td>
-                    <td className="px-3 py-3">
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">Waste</dt>
+                    <dd className="mt-1 text-foreground">
                       {row.is_finalized ? formatNumber(row.waste_units) : "--"}
-                    </td>
-                    <td className="px-3 py-3">
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">Units Sold</dt>
+                    <dd className="mt-1 text-foreground">
                       {row.is_finalized ? formatNumber(row.units_sold) : "--"}
-                    </td>
-                    <td className="px-3 py-3">
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">Recipe Sold</dt>
+                    <dd className="mt-1 text-foreground">
                       {row.is_finalized
                         ? formatRecipeBatches(row.units_sold, row.product_yield_per_recipe)
                         : "--"}
-                    </td>
-                    {canViewFinancial ? (
-                      <td className="px-3 py-3">
+                    </dd>
+                  </div>
+                  {canViewFinancial ? (
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-muted-foreground">Revenue</dt>
+                      <dd className="mt-1 text-foreground">
                         {row.is_finalized
                           ? formatCurrency(row.revenue, workspace?.currency)
                           : "--"}
-                      </td>
-                    ) : null}
-                    {canViewFinancial ? (
-                      <td className="px-3 py-3">
+                      </dd>
+                    </div>
+                  ) : null}
+                  {canViewFinancial ? (
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-muted-foreground">COGS</dt>
+                      <dd className="mt-1 text-foreground">
                         {row.is_finalized
                           ? formatCurrency(row.cogs, workspace?.currency)
                           : "--"}
-                      </td>
-                    ) : null}
-                    {canViewFinancial ? (
-                      <td className="rounded-r-xl px-3 py-3">
+                      </dd>
+                    </div>
+                  ) : null}
+                  {canViewFinancial ? (
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-muted-foreground">Gross Profit</dt>
+                      <dd className="mt-1 text-foreground">
                         {row.is_finalized
                           ? formatCurrency(row.gross_profit, workspace?.currency)
                           : "--"}
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </article>
+            ))}
           </div>
         )}
       </section>

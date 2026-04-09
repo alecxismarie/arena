@@ -99,7 +99,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </form>
         </aside>
 
-        <main className="w-full px-4 py-5 sm:px-6 lg:px-10 lg:py-8">
+        <main className="min-w-0 w-full px-4 py-5 sm:px-6 lg:px-10 lg:py-8">
           <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-2 lg:hidden">
             {navItems.map((item) => {
               const Icon = item.icon;
