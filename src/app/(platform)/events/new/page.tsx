@@ -30,6 +30,8 @@ export default async function NewEventPage() {
       submitLabel="Create event"
       title="Create event"
       description="Add the core details to start tracking performance."
+      secondaryActionHref="/calendar"
+      secondaryActionLabel="Calendar"
     />
   );
 }

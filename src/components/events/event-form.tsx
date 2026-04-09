@@ -4,6 +4,7 @@ import { EventRecord } from "@/lib/analytics";
 import { BrandSelect } from "@/components/ui/brand-select";
 import { resolveWorkspaceCurrency } from "@/lib/workspace-options";
 import { format } from "date-fns";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type VenueOption = {
@@ -23,6 +24,8 @@ type EventFormProps = {
   submitLabel: string;
   title: string;
   description: string;
+  secondaryActionHref?: string;
+  secondaryActionLabel?: string;
 };
 
 export function EventForm({
@@ -36,6 +39,8 @@ export function EventForm({
   submitLabel,
   title,
   description,
+  secondaryActionHref,
+  secondaryActionLabel,
 }: EventFormProps) {
   const isCreateMode = !event;
   const shouldUseVenueSelect = !isCreateMode || venues.length > 1;
@@ -278,13 +283,21 @@ export function EventForm({
           ) : null}
         </div>
 
-        <div className="pt-1">
+        <div className="flex flex-wrap gap-2 pt-1">
           <button
             type="submit"
             className="btn-primary rounded-xl px-5 py-2.5 text-sm font-semibold"
           >
             {submitLabel}
           </button>
+          {secondaryActionHref && secondaryActionLabel ? (
+            <Link
+              href={secondaryActionHref}
+              className="btn-secondary rounded-xl px-5 py-2.5 text-sm font-medium"
+            >
+              {secondaryActionLabel}
+            </Link>
+          ) : null}
         </div>
       </form>
     </section>
