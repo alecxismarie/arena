@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { getAuthContext } from "@/lib/auth";
+import { cache } from "react";
 
-export async function getWorkspaceById(workspaceId: string) {
+export const getWorkspaceById = cache(async function getWorkspaceById(workspaceId: string) {
   return prisma.workspace.findUnique({
     where: { id: workspaceId },
     select: {
@@ -13,7 +14,7 @@ export async function getWorkspaceById(workspaceId: string) {
       updated_at: true,
     },
   });
-}
+});
 
 export async function getCurrentWorkspace() {
   const context = await getAuthContext();

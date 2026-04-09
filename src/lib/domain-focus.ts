@@ -16,6 +16,23 @@ export type DomainUsageSignals = {
   };
 };
 
+export async function getCalendarNavAvailability(
+  workspaceId: string,
+): Promise<boolean> {
+  const [hasEvent, hasAssetRecord] = await Promise.all([
+    prisma.event.findFirst({
+      where: { workspace_id: workspaceId },
+      select: { id: true },
+    }),
+    prisma.assetRecord.findFirst({
+      where: { workspace_id: workspaceId },
+      select: { id: true },
+    }),
+  ]);
+
+  return Boolean(hasEvent || hasAssetRecord);
+}
+
 const DOMAIN_TIE_BREAKER: DomainKey[] = ["inventory", "assets", "events"];
 
 function resolvePrimaryDomain(scores: Record<DomainKey, number>): DomainKey {

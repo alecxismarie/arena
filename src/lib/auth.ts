@@ -2,6 +2,7 @@ import "server-only";
 
 import { WorkspaceRole } from "@prisma/client";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 
 const SESSION_COOKIE_NAME = "signals_session";
@@ -30,19 +31,19 @@ export type IdentityContext = {
   email: string;
 };
 
-async function getSessionIdFromRequest() {
+const getSessionIdFromRequest = cache(async function getSessionIdFromRequest() {
   const cookieStore = await cookies();
   const sessionId = cookieStore.get(SESSION_COOKIE_NAME)?.value?.trim();
   return sessionId || null;
-}
+});
 
-async function getIdentityUserIdFromRequest() {
+const getIdentityUserIdFromRequest = cache(async function getIdentityUserIdFromRequest() {
   const cookieStore = await cookies();
   const userId = cookieStore.get(IDENTITY_COOKIE_NAME)?.value?.trim();
   return userId || null;
-}
+});
 
-export async function getAuthContext(): Promise<AuthContext | null> {
+export const getAuthContext = cache(async function getAuthContext(): Promise<AuthContext | null> {
   const sessionId = await getSessionIdFromRequest();
   if (!sessionId) return null;
 
@@ -79,7 +80,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     workspaceId: session.workspace_id,
     role: membership.role,
   };
-}
+});
 
 export async function requireAuthContext() {
   const context = await getAuthContext();
@@ -89,7 +90,7 @@ export async function requireAuthContext() {
   return context;
 }
 
-export async function getIdentityContext(): Promise<IdentityContext | null> {
+export const getIdentityContext = cache(async function getIdentityContext(): Promise<IdentityContext | null> {
   const auth = await getAuthContext();
   const userId = auth?.userId ?? (await getIdentityUserIdFromRequest());
   if (!userId) {
@@ -109,7 +110,7 @@ export async function getIdentityContext(): Promise<IdentityContext | null> {
     userId: user.id,
     email: user.email,
   };
-}
+});
 
 export async function requireIdentityContext() {
   const context = await getIdentityContext();

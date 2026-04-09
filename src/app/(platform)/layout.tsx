@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { getAuthContext } from "@/lib/auth";
-import { getDomainUsageSignals } from "@/lib/domain-focus";
+import { getCalendarNavAvailability } from "@/lib/domain-focus";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -14,14 +14,12 @@ export default async function PlatformLayout({
   if (!context) {
     redirect("/");
   }
-  const domainSignals = await getDomainUsageSignals(context.workspaceId);
+  const canAccessCalendar = await getCalendarNavAvailability(context.workspaceId);
 
   return (
     <DashboardLayout
       canAccessSettings={context.role === "owner"}
-      canAccessCalendar={
-        domainSignals.counts.events > 0 || domainSignals.counts.assets > 0
-      }
+      canAccessCalendar={canAccessCalendar}
     >
       {children}
     </DashboardLayout>
