@@ -147,6 +147,10 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
             {selectedDateLabel}: daily sales, revenue, gross profit, and risk signals from product
             closing reports.
           </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Operational completeness: {formatNumber(summary.metrics.reportCount)} closed report
+            {summary.metrics.reportCount === 1 ? "" : "s"}.
+          </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <form action="/inventory" method="get" className="flex items-end gap-2">
@@ -190,7 +194,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
       </header>
 
       <section
-        className={`grid gap-4 ${canViewFinancial ? "sm:grid-cols-2 xl:grid-cols-7" : "sm:grid-cols-2 xl:grid-cols-5"}`}
+        className={`grid gap-4 ${canViewFinancial ? "sm:grid-cols-2 xl:grid-cols-6" : "sm:grid-cols-2 xl:grid-cols-4"}`}
       >
         <article className="rounded-2xl border border-border/60 bg-card p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Units Sold</p>
@@ -202,12 +206,6 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Recipe Batches Sold</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
             {summary.metrics.totalRecipeBatchesSold.toFixed(2)}
-          </p>
-        </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Closed Reports</p>
-          <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(summary.metrics.reportCount)}
           </p>
         </article>
         <article className="rounded-2xl border border-border/60 bg-card p-4">
