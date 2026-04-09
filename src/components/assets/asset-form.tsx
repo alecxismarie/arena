@@ -2,8 +2,6 @@
 
 import {
   createAssetRecordAction,
-  INITIAL_ASSET_FORM_STATE,
-  type AssetFormState,
 } from "@/app/actions/asset-actions";
 import { useActionState } from "react";
 
@@ -11,7 +9,14 @@ type AssetFormProps = {
   canViewFinancial: boolean;
 };
 
+type AssetFormState = {
+  error: string | null;
+};
+
 const todayDateValue = new Date().toISOString().slice(0, 10);
+const INITIAL_ASSET_FORM_STATE: AssetFormState = {
+  error: null,
+};
 
 export function AssetForm({ canViewFinancial }: AssetFormProps) {
   const [state, formAction, isPending] = useActionState<AssetFormState, FormData>(

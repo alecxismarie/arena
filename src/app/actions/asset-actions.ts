@@ -10,10 +10,6 @@ export type AssetFormState = {
   error: string | null;
 };
 
-export const INITIAL_ASSET_FORM_STATE: AssetFormState = {
-  error: null,
-};
-
 function parseAssetName(value: FormDataEntryValue | null) {
   const assetName = String(value ?? "").trim();
   if (!assetName) {

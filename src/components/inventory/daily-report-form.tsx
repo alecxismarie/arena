@@ -2,8 +2,6 @@
 
 import {
   createDailyProductReportAction,
-  INITIAL_DAILY_REPORT_FORM_STATE,
-  type DailyReportFormState,
 } from "@/app/actions/inventory-actions";
 import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
@@ -19,7 +17,14 @@ type DailyReportFormProps = {
   products: ProductOption[];
 };
 
+type DailyReportFormState = {
+  error: string | null;
+};
+
 const todayDateValue = new Date().toISOString().slice(0, 10);
+const INITIAL_DAILY_REPORT_FORM_STATE: DailyReportFormState = {
+  error: null,
+};
 
 function calculatePreviewUnitsSold(
   beginningStock: string,

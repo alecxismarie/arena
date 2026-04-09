@@ -14,16 +14,8 @@ export type ProductFormState = {
   error: string | null;
 };
 
-export const INITIAL_PRODUCT_FORM_STATE: ProductFormState = {
-  error: null,
-};
-
 export type DailyReportFormState = {
   error: string | null;
-};
-
-export const INITIAL_DAILY_REPORT_FORM_STATE: DailyReportFormState = {
-  error: null,
 };
 
 function parseName(value: FormDataEntryValue | null, field: string) {

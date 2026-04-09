@@ -2,14 +2,20 @@
 
 import {
   createProductAction,
-  INITIAL_PRODUCT_FORM_STATE,
-  type ProductFormState,
 } from "@/app/actions/inventory-actions";
 import Link from "next/link";
 import { useActionState } from "react";
 
 type ProductFormProps = {
   canManagePricing: boolean;
+};
+
+type ProductFormState = {
+  error: string | null;
+};
+
+const INITIAL_PRODUCT_FORM_STATE: ProductFormState = {
+  error: null,
 };
 
 export function ProductForm({ canManagePricing }: ProductFormProps) {
