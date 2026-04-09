@@ -14,7 +14,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -26,12 +26,25 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Cog },
 ];
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+type DashboardLayoutProps = {
+  children: React.ReactNode;
+  canAccessSettings: boolean;
+};
+
+export function DashboardLayout({ children, canAccessSettings }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
 
+  const visibleNavItems = useMemo(
+    () =>
+      canAccessSettings
+        ? navItems
+        : navItems.filter((item) => item.href !== "/settings"),
+    [canAccessSettings],
+  );
+
   useEffect(() => {
-    navItems.forEach((item) => {
+    visibleNavItems.forEach((item) => {
       const isCurrentPath =
         pathname === item.href || pathname.startsWith(`${item.href}/`);
 
@@ -39,7 +52,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         router.prefetch(item.href);
       }
     });
-  }, [pathname, router]);
+  }, [pathname, router, visibleNavItems]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_0%_0%,rgba(231,150,21,0.16),transparent_38%),radial-gradient(circle_at_100%_0%,rgba(80,56,39,0.09),transparent_36%),linear-gradient(180deg,var(--color-surface),var(--color-surface-soft))] text-foreground">
@@ -59,7 +72,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="flex-1 space-y-1.5">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const active =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -101,7 +114,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         <main className="min-w-0 w-full px-4 py-5 sm:px-6 lg:px-10 lg:py-8">
           <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-2 lg:hidden">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const active =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);

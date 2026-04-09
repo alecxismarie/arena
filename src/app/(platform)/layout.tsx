@@ -14,5 +14,9 @@ export default async function PlatformLayout({
     redirect("/");
   }
 
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return (
+    <DashboardLayout canAccessSettings={context.role === "owner"}>
+      {children}
+    </DashboardLayout>
+  );
 }

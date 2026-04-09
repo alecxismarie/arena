@@ -36,6 +36,7 @@ export default async function DashboardPage() {
     account,
     inventoryProductCount,
     inventoryReportCount,
+    inventoryOpenReportCount,
     assetRecordCount,
   ] = await Promise.all([
     getDashboardData(),
@@ -52,6 +53,12 @@ export default async function DashboardPage() {
     prisma.dailyProductReport.count({
       where: { workspace_id: context.workspaceId },
     }),
+    prisma.dailyProductReport.count({
+      where: {
+        workspace_id: context.workspaceId,
+        is_finalized: false,
+      },
+    }),
     prisma.assetRecord.count({
       where: { workspace_id: context.workspaceId },
     }),
@@ -62,11 +69,6 @@ export default async function DashboardPage() {
   const workspaceLabel = workspace?.name ?? "No workspace";
   const totalEvents =
     data.stats.find((stat) => stat.key === "events")?.value ?? 0;
-  const hasAnyDomainData =
-    totalEvents > 0 ||
-    inventoryProductCount > 0 ||
-    inventoryReportCount > 0 ||
-    assetRecordCount > 0;
   const domainCards = [
     {
       key: "events",
@@ -106,63 +108,53 @@ export default async function DashboardPage() {
       ctaLabel: assetRecordCount > 0 ? "Open assets" : "Add asset record",
     },
   ] as const;
+  const domainStatuses = [
+    {
+      key: "events",
+      label: "Events",
+      status: totalEvents > 0 ? "Active" : "Not started",
+      isPositive: totalEvents > 0,
+      detail: `${formatNumber(totalEvents)} event record${totalEvents === 1 ? "" : "s"}`,
+    },
+    {
+      key: "inventory",
+      label: "Inventory",
+      status:
+        inventoryProductCount === 0
+          ? "Not started"
+          : inventoryReportCount > 0
+            ? "Active"
+            : "Setup only",
+      isPositive: inventoryProductCount > 0 && inventoryReportCount > 0,
+      detail: `${formatNumber(inventoryReportCount)} report${inventoryReportCount === 1 ? "" : "s"} · ${formatNumber(inventoryProductCount)} product${inventoryProductCount === 1 ? "" : "s"}`,
+    },
+    {
+      key: "assets",
+      label: "Assets",
+      status: assetRecordCount > 0 ? "Active" : "Not started",
+      isPositive: assetRecordCount > 0,
+      detail: `${formatNumber(assetRecordCount)} asset record${assetRecordCount === 1 ? "" : "s"}`,
+    },
+  ] as const;
+  const attentionItems: string[] = [];
 
-  if (!hasAnyDomainData) {
-    return (
-      <div className="space-y-6">
-        <header className="rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_8px_24px_-22px_rgba(15,23,42,0.8)]">
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
-            Workspace ready
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Start by adding your first operational record in Events, Inventory, or Assets.
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Workspace: <span className="font-semibold text-accent">{workspaceLabel}</span>
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {accountLabel} - {roleLabel}
-          </p>
-        </header>
-
-        <section className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
-          <h2 className="text-lg font-semibold text-foreground">
-            Get started
-          </h2>
-          <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-            <li>Create an event, inventory, or asset record</li>
-            <li>Capture real operational data for the selected domain</li>
-            <li>Review deterministic metrics and insights</li>
-          </ol>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              href="/events/new"
-              className="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
-            >
-              Create event
-            </Link>
-            <Link
-              href="/inventory/products/new"
-              className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-medium"
-            >
-              Add product
-            </Link>
-            <Link
-              href="/assets/new"
-              className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-medium"
-            >
-              Add asset record
-            </Link>
-            <Link
-              href="/settings"
-              className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-medium"
-            >
-              Review workspace settings
-            </Link>
-          </div>
-        </section>
-      </div>
+  if (totalEvents === 0) {
+    attentionItems.push(
+      "No event records yet. Event analytics will appear after your first event.",
     );
+  }
+  if (inventoryOpenReportCount > 0) {
+    attentionItems.push(
+      `${formatNumber(inventoryOpenReportCount)} inventory report${inventoryOpenReportCount === 1 ? "" : "s"} still need closing finalization.`,
+    );
+  }
+  if (assetRecordCount === 0) {
+    attentionItems.push(
+      "No asset records yet. Asset utilization trends are currently unavailable.",
+    );
+  }
+  if (attentionItems.length === 0) {
+    attentionItems.push("No critical blockers detected across Events, Inventory, and Assets.");
   }
 
   return (
@@ -219,31 +211,73 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      {totalEvents === 0 ? (
-        <section className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
-          <h2 className="text-base font-semibold text-foreground">
-            Event analytics will appear after your first event
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            This overview currently has data for Inventory and/or Assets, but event-specific
-            charts and reports require at least one event record.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link
-              href="/events/new"
-              className="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
-            >
-              Create event
-            </Link>
-            <Link
-              href="/calendar"
-              className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-medium"
-            >
-              Open calendar
-            </Link>
+      <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+        <h2 className="text-base font-semibold text-foreground">Operations pulse</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Domain-neutral operational status, attention items, and quick actions.
+        </p>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {domainStatuses.map((domain) => (
+              <article
+                key={domain.key}
+                className="rounded-2xl border border-border/60 bg-background/70 p-3"
+              >
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{domain.label}</p>
+                <p
+                  className={`mt-1 text-sm font-semibold ${
+                    domain.isPositive ? "text-emerald-700" : "text-amber-700"
+                  }`}
+                >
+                  {domain.status}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{domain.detail}</p>
+              </article>
+            ))}
           </div>
-        </section>
-      ) : (
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Needs attention</h3>
+            <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+              {attentionItems.map((item) => (
+                <li
+                  key={item}
+                  className="rounded-xl border border-border/70 bg-background/70 px-3 py-2"
+                >
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                href="/inventory/reports/new"
+                className="btn-primary rounded-xl px-3.5 py-2 text-xs font-semibold"
+              >
+                Log inventory
+              </Link>
+              <Link
+                href="/assets/new"
+                className="btn-secondary rounded-xl px-3.5 py-2 text-xs font-medium"
+              >
+                Log asset
+              </Link>
+              <Link
+                href="/events/new"
+                className="btn-secondary rounded-xl px-3.5 py-2 text-xs font-medium"
+              >
+                Log event
+              </Link>
+              <Link
+                href="/reports"
+                className="btn-secondary rounded-xl px-3.5 py-2 text-xs font-medium"
+              >
+                Open reports
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {totalEvents > 0 ? (
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {data.stats
@@ -350,7 +384,7 @@ export default async function DashboardPage() {
             </ChartCard>
           </section>
         </>
-      )}
+      ) : null}
     </div>
   );
 }
