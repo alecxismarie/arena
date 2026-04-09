@@ -178,8 +178,7 @@ export function OnboardingForm() {
       }
 
       if ("redirectTo" in result) {
-        setIsSubmitting(false);
-        window.location.assign(result.redirectTo);
+        window.location.replace(result.redirectTo);
         return;
       }
 

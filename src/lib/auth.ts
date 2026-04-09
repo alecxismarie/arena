@@ -2,6 +2,7 @@ import "server-only";
 
 import { WorkspaceRole } from "@prisma/client";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 
 const SESSION_COOKIE_NAME = "signals_session";
@@ -42,7 +43,7 @@ async function getIdentityUserIdFromRequest() {
   return userId || null;
 }
 
-export async function getAuthContext(): Promise<AuthContext | null> {
+async function resolveAuthContext(): Promise<AuthContext | null> {
   const sessionId = await getSessionIdFromRequest();
   if (!sessionId) return null;
 
@@ -81,6 +82,8 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   };
 }
 
+export const getAuthContext = cache(resolveAuthContext);
+
 export async function requireAuthContext() {
   const context = await getAuthContext();
   if (!context) {
@@ -89,7 +92,7 @@ export async function requireAuthContext() {
   return context;
 }
 
-export async function getIdentityContext(): Promise<IdentityContext | null> {
+async function resolveIdentityContext(): Promise<IdentityContext | null> {
   const auth = await getAuthContext();
   const userId = auth?.userId ?? (await getIdentityUserIdFromRequest());
   if (!userId) {
@@ -110,6 +113,8 @@ export async function getIdentityContext(): Promise<IdentityContext | null> {
     email: user.email,
   };
 }
+
+export const getIdentityContext = cache(resolveIdentityContext);
 
 export async function requireIdentityContext() {
   const context = await getIdentityContext();

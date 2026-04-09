@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -27,6 +28,18 @@ const navItems = [
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    navItems.forEach((item) => {
+      const isCurrentPath =
+        pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+      if (!isCurrentPath) {
+        router.prefetch(item.href);
+      }
+    });
+  }, [pathname, router]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_0%_0%,rgba(231,150,21,0.16),transparent_38%),radial-gradient(circle_at_100%_0%,rgba(80,56,39,0.09),transparent_36%),linear-gradient(180deg,var(--color-surface),var(--color-surface-soft))] text-foreground">
@@ -55,6 +68,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onMouseEnter={() => router.prefetch(item.href)}
+                  onFocus={() => router.prefetch(item.href)}
                   className={cn(
                     "group flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-sm transition-all",
                     active
@@ -94,6 +109,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onMouseEnter={() => router.prefetch(item.href)}
+                  onFocus={() => router.prefetch(item.href)}
                   className={cn(
                     "inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium",
                     active
