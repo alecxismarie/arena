@@ -10,6 +10,7 @@ type ProductOption = {
   id: string;
   name: string;
   category: string | null;
+  yield_per_recipe: number;
   is_active: boolean;
 };
 
@@ -47,6 +48,13 @@ function calculatePreviewUnitsSold(
   return beginning + added - ending - waste;
 }
 
+function formatRecipeEquivalent(units: number, yieldPerRecipe: number) {
+  if (!Number.isFinite(units) || !Number.isFinite(yieldPerRecipe) || yieldPerRecipe <= 0) {
+    return "--";
+  }
+  return `${(units / yieldPerRecipe).toFixed(2)} recipe(s)`;
+}
+
 export function DailyReportForm({ products }: DailyReportFormProps) {
   const activeProducts = useMemo(
     () => products.filter((product) => product.is_active),
@@ -58,10 +66,15 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
   );
 
   const [entryStage, setEntryStage] = useState<"opening" | "closing">("opening");
+  const [selectedProductId, setSelectedProductId] = useState("");
   const [beginningStock, setBeginningStock] = useState("0");
   const [stockAdded, setStockAdded] = useState("0");
   const [endingStock, setEndingStock] = useState("0");
   const [wasteUnits, setWasteUnits] = useState("0");
+  const selectedProduct = useMemo(
+    () => activeProducts.find((product) => product.id === selectedProductId) ?? null,
+    [activeProducts, selectedProductId],
+  );
   const unitsSoldPreview = calculatePreviewUnitsSold(
     beginningStock,
     stockAdded,
@@ -114,7 +127,8 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
               <select
                 name="product_id"
                 required
-                defaultValue=""
+                value={selectedProductId}
+                onChange={(event) => setSelectedProductId(event.target.value)}
                 className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
               >
                 <option value="" disabled>
@@ -124,6 +138,7 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
                   <option key={product.id} value={product.id}>
                     {product.name}
                     {product.category ? ` (${product.category})` : ""}
+                    {` - ${product.yield_per_recipe} pcs/recipe`}
                   </option>
                 ))}
               </select>
@@ -141,18 +156,19 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
             </label>
           </div>
 
-          <label className="block space-y-2 text-sm">
-            <span className="font-medium text-foreground">Staff name</span>
-            <input
-              name="staff_name"
-              placeholder="Who is recording this entry?"
-              required
-              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
-            />
-          </label>
-
           {entryStage === "opening" ? (
             <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2 text-sm">
+                <span className="font-medium text-foreground">Staff name</span>
+                <input
+                  name="staff_name"
+                  placeholder="Recorder name"
+                  maxLength={40}
+                  required
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+                />
+              </label>
+
               <label className="space-y-2 text-sm">
                 <span className="font-medium text-foreground">Beginning stock</span>
                 <input
@@ -167,7 +183,19 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
               </label>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-3">
+            <>
+              <label className="block space-y-2 text-sm md:max-w-md">
+                <span className="font-medium text-foreground">Staff name</span>
+                <input
+                  name="staff_name"
+                  placeholder="Recorder name"
+                  maxLength={40}
+                  required
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+                />
+              </label>
+
+              <div className="grid gap-4 md:grid-cols-3">
               <label className="space-y-2 text-sm">
                 <span className="font-medium text-foreground">Stock added</span>
                 <input
@@ -205,13 +233,17 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
                   className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
                 />
               </label>
-            </div>
+              </div>
+            </>
           )}
 
           <div className="rounded-xl border border-border/70 bg-background/70 px-4 py-3 text-sm text-muted-foreground">
             {entryStage === "opening" ? (
               <span className="block font-medium text-foreground">
                 Opening saved: {beginningStock} units. Sales are not computed yet.
+                {selectedProduct
+                  ? ` (${formatRecipeEquivalent(Number(beginningStock || "0"), selectedProduct.yield_per_recipe)})`
+                  : ""}
               </span>
             ) : (
               <>
@@ -221,6 +253,12 @@ export function DailyReportForm({ products }: DailyReportFormProps) {
                   Preview delta (without opening reference):{" "}
                   {unitsSoldPreview === null ? "--" : unitsSoldPreview}
                 </span>
+                {selectedProduct && unitsSoldPreview !== null ? (
+                  <span className="mt-1 block font-medium text-foreground">
+                    Recipe equivalent:{" "}
+                    {formatRecipeEquivalent(unitsSoldPreview, selectedProduct.yield_per_recipe)}
+                  </span>
+                ) : null}
               </>
             )}
           </div>

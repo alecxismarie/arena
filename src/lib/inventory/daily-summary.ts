@@ -37,12 +37,15 @@ function buildMetrics(reports: DailyProductReportItem[]): DailyBusinessSummaryMe
   const totals = finalizedReports.reduce(
     (acc, report) => ({
       unitsSold: acc.unitsSold + report.units_sold,
+      recipeBatches:
+        acc.recipeBatches + report.units_sold / Math.max(report.product_yield_per_recipe, 1),
       revenue: acc.revenue + report.revenue,
       cogs: acc.cogs + report.cogs,
       grossProfit: acc.grossProfit + report.gross_profit,
     }),
     {
       unitsSold: 0,
+      recipeBatches: 0,
       revenue: 0,
       cogs: 0,
       grossProfit: 0,
@@ -110,6 +113,7 @@ function buildMetrics(reports: DailyProductReportItem[]): DailyBusinessSummaryMe
   return {
     reportCount: finalizedReports.length,
     totalUnitsSold: totals.unitsSold,
+    totalRecipeBatchesSold: roundTo(totals.recipeBatches, 2),
     totalRevenue: roundTo(totals.revenue, 2),
     totalCogs: roundTo(totals.cogs, 2),
     totalGrossProfit: roundTo(totals.grossProfit, 2),
@@ -242,6 +246,14 @@ function buildInsights({
       key: "best_performing_product",
       level: "neutral",
       message: `Best-performing product today: ${topProduct.productName}.`,
+    });
+  }
+
+  if (metrics.totalRecipeBatchesSold > 0) {
+    insights.push({
+      key: "recipe_batch_equivalent",
+      level: "neutral",
+      message: `Production equivalent sold: ${metrics.totalRecipeBatchesSold.toFixed(2)} recipe batches.`,
     });
   }
 

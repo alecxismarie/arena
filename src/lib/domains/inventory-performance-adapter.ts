@@ -36,6 +36,8 @@ function buildMetrics(
   const totals = reports.reduce(
     (acc, row) => ({
       unitsSold: acc.unitsSold + row.units_sold,
+      recipeBatches:
+        acc.recipeBatches + row.units_sold / Math.max(row.product_yield_per_recipe, 1),
       revenue: acc.revenue + row.revenue,
       cogs: acc.cogs + row.cogs,
       grossProfit: acc.grossProfit + row.gross_profit,
@@ -44,6 +46,7 @@ function buildMetrics(
     }),
     {
       unitsSold: 0,
+      recipeBatches: 0,
       revenue: 0,
       cogs: 0,
       grossProfit: 0,
@@ -136,6 +139,7 @@ function buildMetrics(
     productCount: products.length,
     reportCount: reports.length,
     totalUnitsSold: totals.unitsSold,
+    totalRecipeBatchesSold: roundTo(totals.recipeBatches, 2),
     totalRevenue: roundTo(totals.revenue, 2),
     totalCogs: roundTo(totals.cogs, 2),
     totalGrossProfit: roundTo(totals.grossProfit, 2),
@@ -249,6 +253,14 @@ function buildInsights(
       key: "top_product_signal",
       level: "neutral",
       message: `${topProduct.productName} is the top-selling product by units sold.`,
+    });
+  }
+
+  if (metrics.totalRecipeBatchesSold > 0) {
+    insights.push({
+      key: "recipe_batch_equivalent",
+      level: "neutral",
+      message: `Recipe-equivalent sold volume: ${metrics.totalRecipeBatchesSold.toFixed(2)} batches.`,
     });
   }
 

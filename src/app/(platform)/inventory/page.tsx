@@ -24,6 +24,13 @@ function formatRate(value: number | null) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+function formatRecipeBatches(units: number, yieldPerRecipe: number) {
+  if (!Number.isFinite(units) || !Number.isFinite(yieldPerRecipe) || yieldPerRecipe <= 0) {
+    return "--";
+  }
+  return (units / yieldPerRecipe).toFixed(2);
+}
+
 function insightClass(level: "positive" | "warning" | "neutral") {
   if (level === "positive") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
@@ -52,8 +59,6 @@ function formatAuditEntry(
 ) {
   if (!actor || !timestamp) return "--";
   return `${actor} (${formatInTimezone(timestamp, timezone, {
-    month: "short",
-    day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   })})`;
@@ -185,12 +190,18 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
       </header>
 
       <section
-        className={`grid gap-4 ${canViewFinancial ? "sm:grid-cols-2 xl:grid-cols-6" : "sm:grid-cols-2 xl:grid-cols-4"}`}
+        className={`grid gap-4 ${canViewFinancial ? "sm:grid-cols-2 xl:grid-cols-7" : "sm:grid-cols-2 xl:grid-cols-5"}`}
       >
         <article className="rounded-2xl border border-border/60 bg-card p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Units Sold</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
             {formatNumber(summary.metrics.totalUnitsSold)}
+          </p>
+        </article>
+        <article className="rounded-2xl border border-border/60 bg-card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Recipe Batches Sold</p>
+          <p className="mt-2 text-2xl font-semibold text-foreground">
+            {summary.metrics.totalRecipeBatchesSold.toFixed(2)}
           </p>
         </article>
         <article className="rounded-2xl border border-border/60 bg-card p-4">
@@ -375,6 +386,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                 <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-3 py-2">Date</th>
                   <th className="px-3 py-2">Product</th>
+                  <th className="px-3 py-2">Yield</th>
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Opening Logged</th>
                   <th className="px-3 py-2">Closing Logged</th>
@@ -383,6 +395,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                   <th className="px-3 py-2">Ending</th>
                   <th className="px-3 py-2">Waste</th>
                   <th className="px-3 py-2">Units Sold</th>
+                  <th className="px-3 py-2">Recipe Sold</th>
                   {canViewFinancial ? <th className="px-3 py-2">Revenue</th> : null}
                   {canViewFinancial ? <th className="px-3 py-2">COGS</th> : null}
                   {canViewFinancial ? <th className="px-3 py-2">Gross Profit</th> : null}
@@ -399,6 +412,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                       })}
                     </td>
                     <td className="px-3 py-3 font-medium">{row.product_name}</td>
+                    <td className="px-3 py-3 text-muted-foreground">
+                      {formatNumber(row.product_yield_per_recipe)} pcs/recipe
+                    </td>
                     <td className="px-3 py-3">
                       <span
                         className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-medium ${
@@ -436,6 +452,11 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
                     </td>
                     <td className="px-3 py-3">
                       {row.is_finalized ? formatNumber(row.units_sold) : "--"}
+                    </td>
+                    <td className="px-3 py-3">
+                      {row.is_finalized
+                        ? formatRecipeBatches(row.units_sold, row.product_yield_per_recipe)
+                        : "--"}
                     </td>
                     {canViewFinancial ? (
                       <td className="px-3 py-3">

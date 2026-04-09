@@ -48,7 +48,8 @@ export function ProductForm({ canManagePricing }: ProductFormProps) {
       <header className="mb-5">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Add product</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Set product pricing once, then submit daily stock reports for computed sales and profit.
+          Set product pricing and recipe yield once, then submit daily stock reports for computed
+          sales and profit.
         </p>
       </header>
 
@@ -74,7 +75,7 @@ export function ProductForm({ canManagePricing }: ProductFormProps) {
           </label>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <label className="space-y-2 text-sm">
             <span className="font-medium text-foreground">Selling price per piece</span>
             <input
@@ -97,6 +98,20 @@ export function ProductForm({ canManagePricing }: ProductFormProps) {
               name="cost_price"
               required
               placeholder="e.g. 2.15"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+            />
+          </label>
+
+          <label className="space-y-2 text-sm">
+            <span className="font-medium text-foreground">Yield per recipe (pieces)</span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              name="yield_per_recipe"
+              required
+              defaultValue={1}
+              placeholder="e.g. 24"
               className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
             />
           </label>

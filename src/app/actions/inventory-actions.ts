@@ -95,6 +95,14 @@ function parseNonNegativeNumber(
   return parsed;
 }
 
+function parsePositiveInteger(value: FormDataEntryValue | null, field: string) {
+  const parsed = parseNonNegativeNumber(value, field, { integer: true });
+  if (parsed < 1) {
+    throw new Error(`${field} must be at least 1`);
+  }
+  return parsed;
+}
+
 function parseProductId(value: FormDataEntryValue | null) {
   const productId = String(value ?? "").trim();
   if (!productId) {
@@ -108,8 +116,8 @@ function parseStaffName(value: FormDataEntryValue | null) {
   if (!staffName) {
     throw new Error("Staff name is required");
   }
-  if (staffName.length > 80) {
-    throw new Error("Staff name must be 80 characters or less");
+  if (staffName.length > 40) {
+    throw new Error("Staff name must be 40 characters or less");
   }
   return staffName;
 }
@@ -161,6 +169,10 @@ export async function createProductAction(
     const costPrice = parseNonNegativeNumber(formData.get("cost_price"), "Cost price", {
       integer: false,
     });
+    const yieldPerRecipe = parsePositiveInteger(
+      formData.get("yield_per_recipe"),
+      "Yield per recipe",
+    );
     const category = parseOptionalText(formData.get("category"), 80);
 
     await createInventoryProduct({
@@ -168,6 +180,7 @@ export async function createProductAction(
       name,
       sellingPrice: Number(sellingPrice.toFixed(2)),
       costPrice: Number(costPrice.toFixed(2)),
+      yieldPerRecipe,
       category,
     });
   } catch (error) {

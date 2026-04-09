@@ -192,6 +192,7 @@ model Product {
   name          String
   selling_price Decimal   @db.Decimal(12, 2)
   cost_price    Decimal   @db.Decimal(12, 2)
+  yield_per_recipe Int    @default(1)
   category      String?
   is_active     Boolean   @default(true)
   created_at    DateTime  @default(now())

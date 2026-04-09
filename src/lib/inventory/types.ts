@@ -3,6 +3,7 @@ export type ProductItem = {
   name: string;
   selling_price: number;
   cost_price: number;
+  yield_per_recipe: number;
   category: string | null;
   is_active: boolean;
   created_at: Date;
@@ -13,6 +14,7 @@ export type DailyProductReportItem = {
   id: string;
   product_id: string;
   product_name: string;
+  product_yield_per_recipe: number;
   report_date: Date;
   beginning_stock: number;
   opening_stock_recorded_by: string | null;
@@ -54,6 +56,7 @@ export type InventoryPerformanceMetrics = {
   productCount: number;
   reportCount: number;
   totalUnitsSold: number;
+  totalRecipeBatchesSold: number;
   totalRevenue: number;
   totalCogs: number;
   totalGrossProfit: number;
@@ -82,6 +85,7 @@ export type InventoryPerformanceAssessment = {
 export type DailyBusinessSummaryMetrics = {
   reportCount: number;
   totalUnitsSold: number;
+  totalRecipeBatchesSold: number;
   totalRevenue: number;
   totalCogs: number;
   totalGrossProfit: number;

@@ -20,6 +20,7 @@ function mapProduct(record: {
   name: string;
   selling_price: unknown;
   cost_price: unknown;
+  yield_per_recipe: number;
   category: string | null;
   is_active: boolean;
   created_at: Date;
@@ -30,6 +31,7 @@ function mapProduct(record: {
     name: record.name,
     selling_price: toNumber(record.selling_price),
     cost_price: toNumber(record.cost_price),
+    yield_per_recipe: record.yield_per_recipe,
     category: record.category,
     is_active: record.is_active,
     created_at: record.created_at,
@@ -58,12 +60,14 @@ function mapDailyReport(record: {
   updated_at: Date;
   product: {
     name: string;
+    yield_per_recipe: number;
   };
 }): DailyProductReportItem {
   return {
     id: record.id,
     product_id: record.product_id,
     product_name: record.product.name,
+    product_yield_per_recipe: record.product.yield_per_recipe,
     report_date: record.report_date,
     beginning_stock: record.beginning_stock,
     opening_stock_recorded_by: record.opening_stock_recorded_by,
@@ -136,6 +140,7 @@ async function fetchProductsForWorkspace(workspaceId: string) {
       name: true,
       selling_price: true,
       cost_price: true,
+      yield_per_recipe: true,
       category: true,
       is_active: true,
       created_at: true,
@@ -186,6 +191,7 @@ async function fetchDailyReportsForWorkspace(
       product: {
         select: {
           name: true,
+          yield_per_recipe: true,
         },
       },
     },
@@ -298,6 +304,7 @@ type CreateInventoryProductInput = {
   name: string;
   sellingPrice: number;
   costPrice: number;
+  yieldPerRecipe: number;
   category: string | null;
 };
 
@@ -306,6 +313,7 @@ export async function createInventoryProduct({
   name,
   sellingPrice,
   costPrice,
+  yieldPerRecipe,
   category,
 }: CreateInventoryProductInput) {
   return prisma.product.create({
@@ -314,6 +322,7 @@ export async function createInventoryProduct({
       name,
       selling_price: sellingPrice,
       cost_price: costPrice,
+      yield_per_recipe: yieldPerRecipe,
       category,
       is_active: true,
     },

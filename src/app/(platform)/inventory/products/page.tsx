@@ -83,6 +83,7 @@ export default async function InventoryProductsPage() {
                 <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-3 py-2">Product</th>
                   <th className="px-3 py-2">Category</th>
+                  <th className="px-3 py-2">Yield</th>
                   {canViewFinancial ? <th className="px-3 py-2">Selling price</th> : null}
                   {canViewFinancial ? <th className="px-3 py-2">Cost price</th> : null}
                   <th className="px-3 py-2">Status</th>
@@ -96,6 +97,9 @@ export default async function InventoryProductsPage() {
                     <td className="rounded-l-xl px-3 py-3 font-medium">{product.name}</td>
                     <td className="px-3 py-3 text-muted-foreground">
                       {product.category ?? "--"}
+                    </td>
+                    <td className="px-3 py-3 text-muted-foreground">
+                      {product.yield_per_recipe} pcs/recipe
                     </td>
                     {canViewFinancial ? (
                       <td className="px-3 py-3">

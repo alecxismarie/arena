@@ -19,6 +19,7 @@ export default async function NewInventoryDailyReportPage() {
         id: product.id,
         name: product.name,
         category: product.category,
+        yield_per_recipe: product.yield_per_recipe,
         is_active: product.is_active,
       }))}
     />
