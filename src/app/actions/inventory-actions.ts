@@ -10,11 +10,11 @@ import {
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-export type ProductFormState = {
+type ProductFormState = {
   error: string | null;
 };
 
-export type DailyReportFormState = {
+type DailyReportFormState = {
   error: string | null;
 };
 
