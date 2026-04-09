@@ -8,6 +8,7 @@ import { ChartCard } from "@/components/ui/chart-card";
 import { getAssetUtilizationData } from "@/lib/asset";
 import { getReportsData } from "@/lib/analytics";
 import { getAuthContext } from "@/lib/auth";
+import { DomainKey, getDomainUsageSignals } from "@/lib/domain-focus";
 import { getInventoryPerformanceData } from "@/lib/inventory";
 import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
 import { getWorkspaceById } from "@/lib/workspace";
@@ -30,17 +31,59 @@ const TAB_ITEMS: Array<{ key: ReportTab; label: string }> = [
   { key: "combined", label: "Combined Overview" },
 ];
 
-function resolveTab(raw: string | string[] | undefined): ReportTab {
+function resolveTab(raw: string | string[] | undefined, fallback: ReportTab): ReportTab {
   const normalized = Array.isArray(raw) ? raw[0] : raw;
   if (normalized === "events") return "events";
   if (normalized === "inventory") return "inventory";
   if (normalized === "assets") return "assets";
   if (normalized === "combined") return "combined";
+  return fallback;
+}
+
+function tabHref(tab: ReportTab, defaultTab: ReportTab) {
+  return tab === defaultTab ? "/reports" : `/reports?tab=${tab}`;
+}
+
+function domainLabel(domain: DomainKey) {
+  if (domain === "inventory") return "Inventory";
+  if (domain === "assets") return "Assets";
+  return "Events";
+}
+
+function mapDomainToReportTab(domain: DomainKey): ReportTab {
+  if (domain === "inventory") return "inventory";
+  if (domain === "assets") return "assets";
   return "events";
 }
 
-function tabHref(tab: ReportTab) {
-  return tab === "events" ? "/reports" : `/reports?tab=${tab}`;
+function primaryDomainAction(domain: DomainKey): {
+  href: string;
+  label: string;
+  secondaryHref: string;
+  secondaryLabel: string;
+} {
+  if (domain === "inventory") {
+    return {
+      href: "/inventory",
+      label: "Open inventory",
+      secondaryHref: "/inventory/reports/new",
+      secondaryLabel: "Log inventory",
+    };
+  }
+  if (domain === "assets") {
+    return {
+      href: "/assets",
+      label: "Open assets",
+      secondaryHref: "/assets/new",
+      secondaryLabel: "Add asset record",
+    };
+  }
+  return {
+    href: "/events",
+    label: "Open events",
+    secondaryHref: "/events/new",
+    secondaryLabel: "Create event",
+  };
 }
 
 function renderEventsSection(params: {
@@ -48,28 +91,32 @@ function renderEventsSection(params: {
   canViewFinancial: boolean;
   timezone?: string;
   currency?: string;
+  primaryDomain: DomainKey;
 }) {
-  const { report, canViewFinancial, timezone, currency } = params;
+  const { report, canViewFinancial, timezone, currency, primaryDomain } = params;
+  const primaryAction = primaryDomainAction(primaryDomain);
 
   if (report.eventSummaryRows.length === 0) {
     return (
       <section className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
         <h2 className="text-lg font-semibold text-foreground">No event reports yet</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Event reports become available after your first event record.
+          {primaryDomain === "events"
+            ? "Event reports become available after your first event record."
+            : `Your workspace is currently more active in ${domainLabel(primaryDomain)}.`}
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Link
-            href="/events/new"
+            href={primaryAction.secondaryHref}
             className="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
           >
-            Create event
+            {primaryAction.secondaryLabel}
           </Link>
           <Link
-            href="/events"
+            href={primaryAction.href}
             className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-medium"
           >
-            Open events
+            {primaryAction.label}
           </Link>
         </div>
       </section>
@@ -560,9 +607,13 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   }
 
   const canViewFinancial = context.role === "owner";
-  const params = await searchParams;
-  const tab = resolveTab(params.tab);
-  const workspace = await getWorkspaceById(context.workspaceId);
+  const [params, workspace, domainSignals] = await Promise.all([
+    searchParams,
+    getWorkspaceById(context.workspaceId),
+    getDomainUsageSignals(context.workspaceId),
+  ]);
+  const defaultTab = mapDomainToReportTab(domainSignals.primaryDomain);
+  const tab = resolveTab(params.tab, defaultTab);
 
   let section: ReactNode = null;
 
@@ -573,6 +624,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       canViewFinancial,
       timezone: workspace?.timezone,
       currency: workspace?.currency,
+      primaryDomain: domainSignals.primaryDomain,
     });
   } else if (tab === "inventory") {
     const inventory = await getInventoryPerformanceData();
@@ -609,8 +661,13 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       <header className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.8)]">
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Reports</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Cross-domain operational reporting with dedicated tabs for Events, Inventory, Assets,
-          and a Combined overview.
+          Cross-domain reporting with adaptive default focus based on current workspace usage.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Primary domain:{" "}
+          <span className="font-semibold text-foreground">
+            {domainLabel(domainSignals.primaryDomain)}
+          </span>
         </p>
         <nav className="mt-4 flex flex-wrap gap-2">
           {TAB_ITEMS.map((item) => {
@@ -618,7 +675,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             return (
               <Link
                 key={item.key}
-                href={tabHref(item.key)}
+                href={tabHref(item.key, defaultTab)}
                 className={
                   active
                     ? "btn-primary rounded-xl px-3.5 py-2 text-sm font-semibold"
@@ -630,7 +687,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             );
           })}
         </nav>
-        {tab === "events" && canViewFinancial ? (
+        {tab === "events" && canViewFinancial && domainSignals.counts.events > 0 ? (
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               href="/api/reports/export?report=event_summary"
