@@ -9,7 +9,7 @@ import {
   formatInTimezone,
   formatNumber,
 } from "@/lib/utils";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -72,7 +72,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     redirect("/");
   }
 
-  const [workspace, params] = await Promise.all([getCurrentWorkspace(), searchParams]);
+  const [workspace, params] = await Promise.all([getWorkspaceById(context.workspaceId), searchParams]);
   const defaultDateKey = formatDateKeyInTimezone(new Date(), workspace?.timezone);
   const selectedDate =
     extractDateParam(params.date) ?? normalizeInventoryDateKey(defaultDateKey) ?? defaultDateKey;
@@ -506,3 +506,4 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     </div>
   );
 }
+

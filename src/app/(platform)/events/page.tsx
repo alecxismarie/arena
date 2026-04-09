@@ -1,7 +1,7 @@
 import { EventCard } from "@/components/events/event-card";
 import { getEvents } from "@/lib/analytics";
 import { getAuthContext } from "@/lib/auth";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -15,7 +15,7 @@ export default async function EventsPage() {
 
   const [events, workspace] = await Promise.all([
     getEvents(),
-    getCurrentWorkspace(),
+    getWorkspaceById(context.workspaceId),
   ]);
   const showFinancial = context.role === "owner";
 
@@ -86,3 +86,4 @@ export default async function EventsPage() {
     </div>
   );
 }
+

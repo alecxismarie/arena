@@ -2,7 +2,7 @@ import { updateEventAction } from "@/app/actions/event-actions";
 import { EventForm } from "@/components/events/event-form";
 import { getEventById, getVenues } from "@/lib/analytics";
 import { getAuthContext } from "@/lib/auth";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceById } from "@/lib/workspace";
 import { notFound, redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export default async function EditEventPage({
   const [payload, venues, workspace] = await Promise.all([
     getEventById(id),
     getVenues(),
-    getCurrentWorkspace(),
+    getWorkspaceById(context.workspaceId),
   ]);
 
   if (!payload) {
@@ -50,3 +50,4 @@ export default async function EditEventPage({
     />
   );
 }
+

@@ -9,7 +9,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { getEventById } from "@/lib/analytics";
 import { getAuthContext } from "@/lib/auth";
 import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceById } from "@/lib/workspace";
 import { format } from "date-fns";
 import { Edit3 } from "lucide-react";
 import Link from "next/link";
@@ -31,7 +31,7 @@ export default async function EventDetailPage({
   const { id } = await params;
   const [payload, workspace] = await Promise.all([
     getEventById(id),
-    getCurrentWorkspace(),
+    getWorkspaceById(context.workspaceId),
   ]);
   if (!payload) {
     notFound();
@@ -305,3 +305,4 @@ export default async function EventDetailPage({
     </div>
   );
 }
+

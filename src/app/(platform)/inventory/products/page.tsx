@@ -2,7 +2,7 @@ import { setProductStatusAction } from "@/app/actions/inventory-actions";
 import { getAuthContext } from "@/lib/auth";
 import { getInventoryProducts } from "@/lib/inventory";
 import { formatCurrency, formatInTimezone } from "@/lib/utils";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -23,7 +23,7 @@ export default async function InventoryProductsPage() {
   const canViewFinancial = context.role === "owner";
   const [products, workspace] = await Promise.all([
     getInventoryProducts(),
-    getCurrentWorkspace(),
+    getWorkspaceById(context.workspaceId),
   ]);
 
   return (
@@ -151,3 +151,4 @@ export default async function InventoryProductsPage() {
     </div>
   );
 }
+

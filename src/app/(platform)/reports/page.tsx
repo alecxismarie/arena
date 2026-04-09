@@ -10,7 +10,7 @@ import { getReportsData } from "@/lib/analytics";
 import { getAuthContext } from "@/lib/auth";
 import { getInventoryPerformanceData } from "@/lib/inventory";
 import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -562,7 +562,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const canViewFinancial = context.role === "owner";
   const params = await searchParams;
   const tab = resolveTab(params.tab);
-  const workspace = await getCurrentWorkspace();
+  const workspace = await getWorkspaceById(context.workspaceId);
 
   let section: ReactNode = null;
 
@@ -670,3 +670,4 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     </div>
   );
 }
+

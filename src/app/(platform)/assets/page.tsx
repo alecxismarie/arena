@@ -1,7 +1,7 @@
 import { getAuthContext } from "@/lib/auth";
 import { getAssetUtilizationData } from "@/lib/asset";
 import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -31,7 +31,7 @@ export default async function AssetsPage() {
   const canViewFinancial = context.role === "owner";
   const [data, workspace] = await Promise.all([
     getAssetUtilizationData(),
-    getCurrentWorkspace(),
+    getWorkspaceById(context.workspaceId),
   ]);
 
   if (data.records.length === 0) {
@@ -194,3 +194,4 @@ export default async function AssetsPage() {
     </div>
   );
 }
+

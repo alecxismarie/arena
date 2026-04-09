@@ -10,7 +10,7 @@ import { getDashboardData } from "@/lib/analytics";
 import { getAuthContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { formatNumber } from "@/lib/utils";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceById } from "@/lib/workspace";
 import { CalendarClock, DollarSign, TicketCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -39,7 +39,7 @@ export default async function DashboardPage() {
     assetRecordCount,
   ] = await Promise.all([
     getDashboardData(),
-    getCurrentWorkspace(),
+    getWorkspaceById(context.workspaceId),
     prisma.user.findUnique({
       where: { id: context.userId },
       select: {
@@ -354,3 +354,4 @@ export default async function DashboardPage() {
     </div>
   );
 }
+

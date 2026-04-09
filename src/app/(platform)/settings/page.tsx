@@ -10,7 +10,7 @@ import {
   resolveWorkspaceCurrency,
   resolveWorkspaceTimezone,
 } from "@/lib/workspace-options";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -29,7 +29,7 @@ export default async function SettingsPage() {
   }
 
   const [workspace, account, memberships] = await Promise.all([
-    getCurrentWorkspace(),
+    getWorkspaceById(context.workspaceId),
     prisma.user.findUnique({
       where: {
         id: context.userId,
@@ -131,3 +131,4 @@ export default async function SettingsPage() {
     </div>
   );
 }
+
