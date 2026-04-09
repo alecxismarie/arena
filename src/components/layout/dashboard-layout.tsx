@@ -29,18 +29,29 @@ const navItems = [
 type DashboardLayoutProps = {
   children: React.ReactNode;
   canAccessSettings: boolean;
+  canAccessCalendar: boolean;
 };
 
-export function DashboardLayout({ children, canAccessSettings }: DashboardLayoutProps) {
+export function DashboardLayout({
+  children,
+  canAccessSettings,
+  canAccessCalendar,
+}: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
 
   const visibleNavItems = useMemo(
-    () =>
-      canAccessSettings
-        ? navItems
-        : navItems.filter((item) => item.href !== "/settings"),
-    [canAccessSettings],
+    () => {
+      let items = navItems;
+      if (!canAccessSettings) {
+        items = items.filter((item) => item.href !== "/settings");
+      }
+      if (!canAccessCalendar) {
+        items = items.filter((item) => item.href !== "/calendar");
+      }
+      return items;
+    },
+    [canAccessSettings, canAccessCalendar],
   );
 
   useEffect(() => {

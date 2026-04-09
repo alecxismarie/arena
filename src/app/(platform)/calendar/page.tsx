@@ -6,7 +6,6 @@ import { CalendarView } from "@/components/calendar/calendar-view";
 import { StatusPill } from "@/components/ui/status-pill";
 import { getCalendarEvents } from "@/lib/analytics";
 import { getAuthContext } from "@/lib/auth";
-import { DomainKey, getDomainUsageSignals } from "@/lib/domain-focus";
 import { formatDateKeyInTimezone, formatInTimezone } from "@/lib/utils";
 import { getWorkspaceById } from "@/lib/workspace";
 import { addDays, format } from "date-fns";
@@ -15,48 +14,16 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-function primaryAction(domain: DomainKey) {
-  if (domain === "inventory") {
-    return {
-      href: "/inventory/reports/new",
-      label: "Log inventory",
-      description: "Track opening/closing inventory by date and staff.",
-    };
-  }
-  if (domain === "assets") {
-    return {
-      href: "/assets/new",
-      label: "Add asset record",
-      description: "Track booked vs idle assets and utilization outcomes.",
-    };
-  }
-  return {
-    href: "/events/new",
-    label: "Create event",
-    description: "Plan event schedules and keep status up to date.",
-  };
-}
-
-function domainLabel(domain: DomainKey) {
-  if (domain === "inventory") return "Inventory";
-  if (domain === "assets") return "Assets";
-  return "Events";
-}
-
 export default async function CalendarPage() {
   const context = await getAuthContext();
   if (!context) {
     redirect("/");
   }
 
-  const [events, workspace, domainSignals] = await Promise.all([
+  const [events, workspace] = await Promise.all([
     getCalendarEvents(),
     getWorkspaceById(context.workspaceId),
-    getDomainUsageSignals(context.workspaceId),
   ]);
-  const action = primaryAction(domainSignals.primaryDomain);
-  const showEventCalendar =
-    events.length > 0 || domainSignals.primaryDomain === "events";
 
   return (
     <div className="space-y-6">
@@ -64,169 +31,116 @@ export default async function CalendarPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">Calendar</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {showEventCalendar
-              ? "Plan schedules and keep status up to date."
-              : `No active event schedule yet. Primary workspace usage is ${domainLabel(domainSignals.primaryDomain)}.`}
+            Plan event schedules and keep status up to date.
           </p>
         </div>
         <Link
-          href={action.href}
+          href="/events/new"
           className="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
         >
-          {action.label}
+          Create event
         </Link>
       </header>
 
-      {showEventCalendar ? (
-        <CalendarView
-          events={events.map((event) => ({
-            id: event.id,
-            name: event.name,
-            dayKey: formatDateKeyInTimezone(event.date, workspace?.timezone),
-            startTime: formatInTimezone(event.start_time, workspace?.timezone, {
-              hour: "numeric",
-              minute: "2-digit",
-            }),
-            status: event.status,
-          }))}
-          timezone={workspace?.timezone}
-        />
-      ) : (
-        <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.8)]">
-          <h2 className="text-lg font-semibold text-foreground">Operations schedule focus</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{action.description}</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              href={action.href}
-              className="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
-            >
-              {action.label}
-            </Link>
-            <Link
-              href="/reports"
-              className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-medium"
-            >
-              Open reports
-            </Link>
-            <Link
-              href="/events/new"
-              className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-medium"
-            >
-              Create event anyway
-            </Link>
-          </div>
-        </section>
-      )}
+      <CalendarView
+        events={events.map((event) => ({
+          id: event.id,
+          name: event.name,
+          dayKey: formatDateKeyInTimezone(event.date, workspace?.timezone),
+          startTime: formatInTimezone(event.start_time, workspace?.timezone, {
+            hour: "numeric",
+            minute: "2-digit",
+          }),
+          status: event.status,
+        }))}
+        timezone={workspace?.timezone}
+      />
 
-      {events.length > 0 ? (
-        <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.8)]">
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-foreground">Calendar Actions</h2>
-            <p className="text-sm text-muted-foreground">
-              Edit, reschedule, or cancel events from one view.
-            </p>
-          </div>
+      <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.8)]">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-foreground">Calendar Actions</h2>
+          <p className="text-sm text-muted-foreground">
+            Edit, reschedule, or cancel events from one view.
+          </p>
+        </div>
 
-          <div className="space-y-3">
-            {events.slice(0, 12).map((event) => (
-              <article
-                key={event.id}
-                className="rounded-2xl border border-border/70 bg-background/80 p-4"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{event.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatInTimezone(event.date, workspace?.timezone, {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}{" "}
-                      -{" "}
-                      {formatInTimezone(event.start_time, workspace?.timezone, {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}{" "}
-                      to{" "}
-                      {formatInTimezone(event.end_time, workspace?.timezone, {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
-                    </p>
-                    <div className="mt-2">
-                      <StatusPill status={event.status} />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={`/events/${event.id}`}
-                      className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
-                    >
-                      Details
-                    </Link>
-                    <Link
-                      href={`/events/${event.id}/edit`}
-                      className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
-                    >
-                      Edit
-                    </Link>
-                    <form action={cancelEventAction}>
-                      <input type="hidden" name="event_id" value={event.id} />
-                      <button
-                        type="submit"
-                        className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
-                      >
-                        Cancel
-                      </button>
-                    </form>
+        <div className="space-y-3">
+          {events.slice(0, 12).map((event) => (
+            <article
+              key={event.id}
+              className="rounded-2xl border border-border/70 bg-background/80 p-4"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{event.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatInTimezone(event.date, workspace?.timezone, {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}{" "}
+                    -{" "}
+                    {formatInTimezone(event.start_time, workspace?.timezone, {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}{" "}
+                    to{" "}
+                    {formatInTimezone(event.end_time, workspace?.timezone, {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                  <div className="mt-2">
+                    <StatusPill status={event.status} />
                   </div>
                 </div>
 
-                <form action={rescheduleEventAction} className="mt-3 flex flex-wrap items-center gap-2">
-                  <input type="hidden" name="event_id" value={event.id} />
-                  <input
-                    name="new_date"
-                    type="date"
-                    defaultValue={format(addDays(event.date, 1), "yyyy-MM-dd")}
-                    className="rounded-xl border border-border bg-background px-3 py-2 text-xs"
-                    required
-                  />
-                  <button
-                    type="submit"
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/events/${event.id}`}
                     className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
                   >
-                    Reschedule
-                  </button>
-                </form>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : (
-        <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.8)]">
-          <h2 className="text-lg font-semibold text-foreground">No events to manage yet</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Signals is prioritizing {domainLabel(domainSignals.primaryDomain)} workflows for this
-            workspace. Add events any time to enable event scheduling views and actions.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              href="/events/new"
-              className="btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold"
-            >
-              Create event
-            </Link>
-            <Link
-              href="/events"
-              className="btn-secondary rounded-xl px-4 py-2.5 text-sm font-medium"
-            >
-              Open events
-            </Link>
-          </div>
-        </section>
-      )}
+                    Details
+                  </Link>
+                  <Link
+                    href={`/events/${event.id}/edit`}
+                    className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
+                  >
+                    Edit
+                  </Link>
+                  <form action={cancelEventAction}>
+                    <input type="hidden" name="event_id" value={event.id} />
+                    <button
+                      type="submit"
+                      className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
+                    >
+                      Cancel
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <form action={rescheduleEventAction} className="mt-3 flex flex-wrap items-center gap-2">
+                <input type="hidden" name="event_id" value={event.id} />
+                <input
+                  name="new_date"
+                  type="date"
+                  defaultValue={format(addDays(event.date, 1), "yyyy-MM-dd")}
+                  className="rounded-xl border border-border bg-background px-3 py-2 text-xs"
+                  required
+                />
+                <button
+                  type="submit"
+                  className="btn-secondary rounded-xl px-3 py-2 text-xs font-medium"
+                >
+                  Reschedule
+                </button>
+              </form>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
