@@ -98,12 +98,15 @@ npm run vercel-build
 
 Behavior:
 
-- Production deploy (`VERCEL_ENV=production`): runs `prisma migrate deploy`, then builds.
+- Production deploy (`VERCEL_ENV=production`): runs `prisma migrate deploy` with retry on
+  transient reachability issues (`P1001`), then builds.
 - Preview/dev deploy: skips migration and only builds.
 
 Requirements:
 
 - Vercel `DATABASE_URL` (Production environment) must point to your production database.
+- Optional strict mode: set `VERCEL_MIGRATE_STRICT=true` to fail the deployment when
+  migration cannot reach the database.
 
 ## Migration Baseline Strategy
 
