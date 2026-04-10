@@ -1,5 +1,10 @@
 import { getAuthContext } from "@/lib/auth";
 import { getAssetUtilizationData } from "@/lib/asset";
+import {
+  selectInsights,
+  selectRatioMetric,
+  selectTotalValue,
+} from "@/lib/domains/metrics-selectors";
 import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
 import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
@@ -36,15 +41,18 @@ export default async function AssetsPage() {
 
   if (data.records.length === 0) {
     return (
-      <div className="space-y-6">
-        <header className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_24px_-22px_rgba(15,23,42,0.8)]">
+      <div className="space-y-7">
+        <header className="rounded-[1.85rem] border border-border/70 bg-gradient-to-br from-card via-card to-surface/80 p-6 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.88)]">
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Asset Control Plane
+          </p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">Assets</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Track asset utilization with deterministic occupancy and idle metrics.
           </p>
         </header>
 
-        <section className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+        <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-6 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
           <h2 className="text-lg font-semibold text-foreground">Get started</h2>
           <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
             <li>Add your first asset record</li>
@@ -64,12 +72,36 @@ export default async function AssetsPage() {
     );
   }
 
-  const { metrics, insights } = data.assessment;
+  const { metrics } = data.assessment;
+  const domainMetrics = data.domainMetrics;
+  const utilizationMetric = selectRatioMetric(domainMetrics, "utilization_rate");
+  const idleMetric = selectRatioMetric(domainMetrics, "idle_rate");
+  const revenuePerAssetMetric = selectRatioMetric(domainMetrics, "revenue_per_asset");
+  const utilizationRate =
+    utilizationMetric && (utilizationMetric.denominator ?? 0) > 0
+      ? utilizationMetric.value
+      : metrics.utilizationRate;
+  const idleRate =
+    idleMetric && (idleMetric.denominator ?? 0) > 0
+      ? idleMetric.value
+      : metrics.idleRate;
+  const totalAssets = selectTotalValue(domainMetrics, "total_assets", metrics.totalAssets);
+  const revenuePerAsset =
+    revenuePerAssetMetric && (revenuePerAssetMetric.denominator ?? 0) > 0
+      ? revenuePerAssetMetric.value
+      : metrics.revenuePerAsset;
+  const insights =
+    selectInsights(domainMetrics).length > 0
+      ? selectInsights(domainMetrics)
+      : data.assessment.insights;
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4 rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_24px_-22px_rgba(15,23,42,0.8)]">
+    <div className="space-y-7">
+      <header className="flex flex-wrap items-end justify-between gap-4 rounded-[1.85rem] border border-border/70 bg-gradient-to-br from-card via-card to-surface/80 p-6 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.88)]">
         <div>
+          <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Asset Control Plane
+          </p>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">Assets</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Monitor utilization, idle capacity, and asset productivity for your workspace.
@@ -86,37 +118,37 @@ export default async function AssetsPage() {
       <section
         className={`grid gap-4 ${canViewFinancial ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-2 xl:grid-cols-3"}`}
       >
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Utilization Rate</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatRate(metrics.utilizationRate)}
+            {formatRate(utilizationRate)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Idle Rate</p>
-          <p className="mt-2 text-2xl font-semibold text-foreground">{formatRate(metrics.idleRate)}</p>
+          <p className="mt-2 text-2xl font-semibold text-foreground">{formatRate(idleRate)}</p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Assets</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(metrics.totalAssets)}
+            {formatNumber(totalAssets)}
           </p>
         </article>
         {canViewFinancial ? (
-          <article className="rounded-2xl border border-border/60 bg-card p-4">
+          <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Revenue per Asset
             </p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
-              {metrics.revenuePerAsset === null
+              {revenuePerAsset === null
                 ? "--"
-                : formatCurrency(metrics.revenuePerAsset, workspace?.currency)}
+                : formatCurrency(revenuePerAsset, workspace?.currency)}
             </p>
           </article>
         ) : null}
       </section>
 
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <header>
           <h2 className="text-base font-semibold text-foreground">
             Deterministic Asset Utilization Insights
@@ -137,7 +169,7 @@ export default async function AssetsPage() {
         </ul>
       </section>
 
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <header className="mb-4">
           <h2 className="text-base font-semibold text-foreground">Asset Records</h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -164,7 +196,7 @@ export default async function AssetsPage() {
                   row.total_assets > 0 ? row.booked_assets / row.total_assets : null;
 
                 return (
-                  <tr key={row.id} className="rounded-xl bg-muted/35 text-foreground">
+                  <tr key={row.id} className="rounded-xl bg-background/80 text-foreground">
                     <td className="rounded-l-xl px-3 py-3 text-muted-foreground">
                       {formatInTimezone(row.record_date, workspace?.timezone, {
                         month: "short",

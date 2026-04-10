@@ -8,9 +8,18 @@ import { ChartCard } from "@/components/ui/chart-card";
 import { getAssetUtilizationData } from "@/lib/asset";
 import { getReportsData } from "@/lib/analytics";
 import { getAuthContext } from "@/lib/auth";
-import { DomainKey, getDomainUsageSignals } from "@/lib/domain-focus";
+import { getDomainUsageSignals } from "@/lib/domain-focus";
+import {
+  selectInsights,
+  selectRanking,
+  selectRatioMetric,
+  selectTotalValue,
+  selectTrendPoints,
+} from "@/lib/domains/metrics-selectors";
+import { LegacySurfaceDomain } from "@/lib/domains/types";
 import { getInventoryPerformanceData } from "@/lib/inventory";
 import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
+import { resolveWorkspaceDomainState } from "@/lib/workspace-domain-config";
 import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -44,19 +53,19 @@ function tabHref(tab: ReportTab, defaultTab: ReportTab) {
   return tab === defaultTab ? "/reports" : `/reports?tab=${tab}`;
 }
 
-function domainLabel(domain: DomainKey) {
+function domainLabel(domain: LegacySurfaceDomain) {
   if (domain === "inventory") return "Inventory";
   if (domain === "assets") return "Assets";
   return "Events";
 }
 
-function mapDomainToReportTab(domain: DomainKey): ReportTab {
+function mapDomainToReportTab(domain: LegacySurfaceDomain): ReportTab {
   if (domain === "inventory") return "inventory";
   if (domain === "assets") return "assets";
   return "events";
 }
 
-function primaryDomainAction(domain: DomainKey): {
+function primaryDomainAction(domain: LegacySurfaceDomain): {
   href: string;
   label: string;
   secondaryHref: string;
@@ -91,14 +100,77 @@ function renderEventsSection(params: {
   canViewFinancial: boolean;
   timezone?: string;
   currency?: string;
-  primaryDomain: DomainKey;
+  primaryDomain: LegacySurfaceDomain;
 }) {
   const { report, canViewFinancial, timezone, currency, primaryDomain } = params;
   const primaryAction = primaryDomainAction(primaryDomain);
+  const domainMetrics = report.domainMetrics;
+  const weeklySalesTrend = selectTrendPoints(domainMetrics, "weekly_sales");
+  const monthlySalesTrend = selectTrendPoints(domainMetrics, "monthly_sales");
+  const weeklySales =
+    weeklySalesTrend.length > 0
+      ? weeklySalesTrend.map((point) => ({
+          label: point.label,
+          tickets: point.value,
+          revenue: typeof point.meta?.revenue === "number" ? point.meta.revenue : 0,
+        }))
+      : report.weeklySales;
+  const monthlySales =
+    monthlySalesTrend.length > 0
+      ? monthlySalesTrend.map((point) => ({
+          label: point.label,
+          tickets: point.value,
+          revenue: typeof point.meta?.revenue === "number" ? point.meta.revenue : 0,
+        }))
+      : report.monthlySales;
+
+  const eventMetricCards = [
+    {
+      label: "Weekly Sales",
+      value: weeklySales[weeklySales.length - 1]?.tickets ?? 0,
+    },
+    {
+      label: "Monthly Sales",
+      value: monthlySales[monthlySales.length - 1]?.tickets ?? 0,
+    },
+    {
+      label: "Expected Attendance",
+      value: selectTotalValue(
+        domainMetrics,
+        "expected_attendance",
+        report.eventSummaryRows.reduce((sum, row) => sum + row.expected_attendees, 0),
+      ),
+    },
+    {
+      label: "Actual Attendance",
+      value: selectTotalValue(
+        domainMetrics,
+        "actual_attendance",
+        report.eventSummaryRows.reduce((sum, row) => sum + row.actual_attendees, 0),
+      ),
+    },
+  ];
+
+  const attendanceRanking = selectRanking(domainMetrics, "attendance_report");
+  const attendanceReport =
+    attendanceRanking.length > 0
+      ? attendanceRanking.map((row) => ({
+          name: row.label,
+          attendance: row.value,
+        }))
+      : report.attendanceReport;
+  const revenueRanking = selectRanking(domainMetrics, "revenue_report");
+  const revenueReport =
+    revenueRanking.length > 0
+      ? revenueRanking.map((row) => ({
+          name: row.label,
+          revenue: row.value,
+        }))
+      : report.revenueReport;
 
   if (report.eventSummaryRows.length === 0) {
     return (
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-6 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h2 className="text-lg font-semibold text-foreground">No event reports yet</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           {primaryDomain === "events"
@@ -126,10 +198,10 @@ function renderEventsSection(params: {
   return (
     <>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {report.metrics.map((metric) => (
+        {eventMetricCards.map((metric) => (
           <article
             key={metric.label}
-            className="rounded-2xl border border-border/60 bg-card p-4 shadow-[0_8px_20px_-18px_rgba(15,23,42,0.75)]"
+            className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.75)]"
           >
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{metric.label}</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">{formatNumber(metric.value)}</p>
@@ -144,7 +216,7 @@ function renderEventsSection(params: {
           className={canViewFinancial ? "xl:col-span-4" : "xl:col-span-7"}
         >
           <SalesTrendChart
-            data={report.weeklySales.map((row) => ({
+            data={weeklySales.map((row) => ({
               label: row.label,
               tickets: row.tickets,
             }))}
@@ -157,11 +229,11 @@ function renderEventsSection(params: {
             className="xl:col-span-3"
           >
             <RevenueTrendChart
-              weekly={report.weeklySales.map((row) => ({
+              weekly={weeklySales.map((row) => ({
                 label: row.label,
                 revenue: row.revenue,
               }))}
-              monthly={report.monthlySales.map((row) => ({
+              monthly={monthlySales.map((row) => ({
                 label: row.label,
                 revenue: row.revenue,
               }))}
@@ -174,7 +246,7 @@ function renderEventsSection(params: {
       <section className={`grid gap-4 ${canViewFinancial ? "xl:grid-cols-2" : "xl:grid-cols-1"}`}>
         <ChartCard title="Attendance Report" subtitle="Top events by actual attendance">
           <ReportBarChart
-            data={report.attendanceReport.map((row) => ({
+            data={attendanceReport.map((row) => ({
               name: row.name,
               attendance: row.attendance,
             }))}
@@ -185,7 +257,7 @@ function renderEventsSection(params: {
         {canViewFinancial ? (
           <ChartCard title="Revenue Report" subtitle="Top events by revenue">
             <ReportBarChart
-              data={report.revenueReport.map((row) => ({
+              data={revenueReport.map((row) => ({
                 name: row.name,
                 revenue: row.revenue,
               }))}
@@ -231,11 +303,57 @@ function renderInventorySection(params: {
   currency?: string;
 }) {
   const { inventory, canViewFinancial, currency } = params;
-  const { metrics, insights } = inventory.assessment;
+  const { metrics } = inventory.assessment;
+  const domainMetrics = inventory.domainMetrics;
+  const insights =
+    selectInsights(domainMetrics).length > 0
+      ? selectInsights(domainMetrics)
+      : inventory.assessment.insights;
+  const productCount = selectTotalValue(domainMetrics, "product_count", inventory.products.length);
+  const reportCount = selectTotalValue(domainMetrics, "report_count", metrics.reportCount);
+  const unitsSold = selectTotalValue(domainMetrics, "units_sold", metrics.totalUnitsSold);
+  const recipeBatches = selectTotalValue(
+    domainMetrics,
+    "recipe_batches_sold",
+    metrics.totalRecipeBatchesSold,
+  );
+  const lowStockCount = selectTotalValue(
+    domainMetrics,
+    "low_stock_count",
+    metrics.lowStockProductCount,
+  );
+  const totalRevenue = selectTotalValue(domainMetrics, "revenue", metrics.totalRevenue);
+  const totalGrossProfit = selectTotalValue(
+    domainMetrics,
+    "gross_profit",
+    metrics.totalGrossProfit,
+  );
+  const topSellingRanking = selectRanking(domainMetrics, "top_selling_products");
+  const topSellingProducts =
+    topSellingRanking.length > 0
+      ? topSellingRanking.map((row) => ({
+          name: row.label,
+          units: row.value,
+        }))
+      : metrics.topSellingProducts.map((row) => ({
+          name: row.productName,
+          units: row.value,
+        }));
+  const highWasteRanking = selectRanking(domainMetrics, "high_waste_products");
+  const highWasteProducts =
+    highWasteRanking.length > 0
+      ? highWasteRanking.map((row) => ({
+          name: row.label,
+          waste: row.value,
+        }))
+      : metrics.highWasteProducts.map((row) => ({
+          name: row.productName,
+          waste: row.wasteUnits,
+        }));
 
   if (inventory.products.length === 0) {
     return (
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-6 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h2 className="text-lg font-semibold text-foreground">No inventory products yet</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Add products and daily inventory logs to unlock inventory reports.
@@ -263,49 +381,49 @@ function renderInventorySection(params: {
       <section
         className={`grid gap-4 ${canViewFinancial ? "sm:grid-cols-2 xl:grid-cols-7" : "sm:grid-cols-2 xl:grid-cols-5"}`}
       >
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Products</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(inventory.products.length)}
+            {formatNumber(productCount)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Closed Reports</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(metrics.reportCount)}
+            {formatNumber(reportCount)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Units Sold</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(metrics.totalUnitsSold)}
+            {formatNumber(unitsSold)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Recipe Batches Sold</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {metrics.totalRecipeBatchesSold.toFixed(2)}
+            {recipeBatches.toFixed(2)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Low Stock</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(metrics.lowStockProductCount)}
+            {formatNumber(lowStockCount)}
           </p>
         </article>
         {canViewFinancial ? (
-          <article className="rounded-2xl border border-border/60 bg-card p-4">
+          <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Revenue</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
-              {formatCurrency(metrics.totalRevenue, currency)}
+              {formatCurrency(totalRevenue, currency)}
             </p>
           </article>
         ) : null}
         {canViewFinancial ? (
-          <article className="rounded-2xl border border-border/60 bg-card p-4">
+          <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Gross Profit</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
-              {formatCurrency(metrics.totalGrossProfit, currency)}
+              {formatCurrency(totalGrossProfit, currency)}
             </p>
           </article>
         ) : null}
@@ -314,31 +432,25 @@ function renderInventorySection(params: {
       <section className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Top-Selling Products" subtitle="By finalized units sold">
           <ReportBarChart
-            data={metrics.topSellingProducts.map((row) => ({
-              name: row.productName,
-              units: row.value,
-            }))}
+            data={topSellingProducts}
             valueKey="units"
             color="#cf8312"
           />
         </ChartCard>
         <ChartCard title="High-Waste Products" subtitle="By accumulated waste units">
           <ReportBarChart
-            data={metrics.highWasteProducts.map((row) => ({
-              name: row.productName,
-              waste: row.wasteUnits,
-            }))}
+            data={highWasteProducts}
             valueKey="waste"
             color="#7f6653"
           />
         </ChartCard>
       </section>
 
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-5">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h3 className="text-base font-semibold text-foreground">Inventory Signals</h3>
         <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
           {insights.map((insight) => (
-            <li key={insight.key} className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+            <li key={insight.key} className="rounded-xl border border-border/70 bg-background/80 px-3 py-2">
               {insight.message}
             </li>
           ))}
@@ -355,11 +467,33 @@ function renderAssetsSection(params: {
   timezone?: string;
 }) {
   const { assets, canViewFinancial, currency, timezone } = params;
-  const { metrics, insights } = assets.assessment;
+  const { metrics } = assets.assessment;
+  const domainMetrics = assets.domainMetrics;
+  const insights =
+    selectInsights(domainMetrics).length > 0
+      ? selectInsights(domainMetrics)
+      : assets.assessment.insights;
+  const recordCount = selectTotalValue(domainMetrics, "record_count", metrics.recordCount);
+  const totalAssets = selectTotalValue(domainMetrics, "total_assets", metrics.totalAssets);
+  const totalBookedAssets = selectTotalValue(
+    domainMetrics,
+    "booked_assets",
+    metrics.totalBookedAssets,
+  );
+  const totalIdleAssets = selectTotalValue(
+    domainMetrics,
+    "idle_assets",
+    metrics.totalIdleAssets,
+  );
+  const revenuePerAssetMetric = selectRatioMetric(domainMetrics, "revenue_per_asset");
+  const revenuePerAsset =
+    revenuePerAssetMetric && (revenuePerAssetMetric.denominator ?? 0) > 0
+      ? revenuePerAssetMetric.value
+      : metrics.revenuePerAsset;
 
   if (assets.records.length === 0) {
     return (
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-6 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h2 className="text-lg font-semibold text-foreground">No asset records yet</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Add asset utilization entries to generate asset reports.
@@ -387,43 +521,43 @@ function renderAssetsSection(params: {
       <section
         className={`grid gap-4 ${canViewFinancial ? "sm:grid-cols-2 xl:grid-cols-5" : "sm:grid-cols-2 xl:grid-cols-4"}`}
       >
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Records</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(metrics.recordCount)}
+            {formatNumber(recordCount)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Assets</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(metrics.totalAssets)}
+            {formatNumber(totalAssets)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Booked Assets</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(metrics.totalBookedAssets)}
+            {formatNumber(totalBookedAssets)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Idle Assets</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(metrics.totalIdleAssets)}
+            {formatNumber(totalIdleAssets)}
           </p>
         </article>
         {canViewFinancial ? (
-          <article className="rounded-2xl border border-border/60 bg-card p-4">
+          <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Revenue per Asset</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
-              {metrics.revenuePerAsset === null
+              {revenuePerAsset === null
                 ? "--"
-                : formatCurrency(metrics.revenuePerAsset, currency)}
+                : formatCurrency(revenuePerAsset, currency)}
             </p>
           </article>
         ) : null}
       </section>
 
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-5">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h3 className="text-base font-semibold text-foreground">Latest Asset Records</h3>
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-full border-separate border-spacing-y-2 text-sm">
@@ -439,7 +573,7 @@ function renderAssetsSection(params: {
             </thead>
             <tbody>
               {assets.records.slice(0, 10).map((row) => (
-                <tr key={row.id} className="rounded-xl bg-muted/35 text-foreground">
+                <tr key={row.id} className="rounded-xl bg-background/80 text-foreground">
                   <td className="rounded-l-xl px-3 py-3 text-muted-foreground">
                     {formatInTimezone(row.record_date, timezone, {
                       month: "short",
@@ -463,11 +597,11 @@ function renderAssetsSection(params: {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-5">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h3 className="text-base font-semibold text-foreground">Asset Signals</h3>
         <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
           {insights.map((insight) => (
-            <li key={insight.key} className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+            <li key={insight.key} className="rounded-xl border border-border/70 bg-background/80 px-3 py-2">
               {insight.message}
             </li>
           ))}
@@ -485,26 +619,54 @@ function renderCombinedSection(params: {
   currency?: string;
 }) {
   const { report, inventory, assets, canViewFinancial, currency } = params;
+  const eventRecordCount = selectTotalValue(
+    report.domainMetrics,
+    "total_events",
+    report.eventSummaryRows.length,
+  );
+  const inventoryReportCount = selectTotalValue(
+    inventory.domainMetrics,
+    "report_count",
+    inventory.assessment.metrics.reportCount,
+  );
+  const assetRecordCount = selectTotalValue(
+    assets.domainMetrics,
+    "record_count",
+    assets.records.length,
+  );
+  const inventoryRevenue = selectTotalValue(
+    inventory.domainMetrics,
+    "revenue",
+    inventory.assessment.metrics.totalRevenue,
+  );
+  const inventoryLeadInsight =
+    selectInsights(inventory.domainMetrics)[0]?.message ??
+    inventory.assessment.insights[0]?.message ??
+    "No inventory signal yet.";
+  const assetLeadInsight =
+    selectInsights(assets.domainMetrics)[0]?.message ??
+    assets.assessment.insights[0]?.message ??
+    "No asset signal yet.";
 
   const coverage = [
     {
       key: "events",
       title: "Events",
-      records: report.eventSummaryRows.length,
+      records: eventRecordCount,
       href: "/events",
       reportHref: "/reports?tab=events",
     },
     {
       key: "inventory",
       title: "Inventory",
-      records: inventory.assessment.metrics.reportCount,
+      records: inventoryReportCount,
       href: "/inventory",
       reportHref: "/reports?tab=inventory",
     },
     {
       key: "assets",
       title: "Assets",
-      records: assets.records.length,
+      records: assetRecordCount,
       href: "/assets",
       reportHref: "/reports?tab=assets",
     },
@@ -513,33 +675,33 @@ function renderCombinedSection(params: {
   return (
     <>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Event Records</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(report.eventSummaryRows.length)}
+            {formatNumber(eventRecordCount)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Closed Inventory Logs</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(inventory.assessment.metrics.reportCount)}
+            {formatNumber(inventoryReportCount)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Asset Records</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(assets.records.length)}
+            {formatNumber(assetRecordCount)}
           </p>
         </article>
         {canViewFinancial ? (
-          <article className="rounded-2xl border border-border/60 bg-card p-4">
+          <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Inventory Revenue</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
-              {formatCurrency(inventory.assessment.metrics.totalRevenue, currency)}
+              {formatCurrency(inventoryRevenue, currency)}
             </p>
           </article>
         ) : (
-          <article className="rounded-2xl border border-border/60 bg-card p-4">
+          <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.72)]">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Active Inventory Products</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
               {formatNumber(inventory.products.filter((row) => row.is_active).length)}
@@ -548,13 +710,13 @@ function renderCombinedSection(params: {
         )}
       </section>
 
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-5">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h3 className="text-base font-semibold text-foreground">Domain Coverage</h3>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {coverage.map((domain) => (
             <article
               key={domain.key}
-              className="rounded-2xl border border-border/70 bg-background/70 p-4"
+              className="rounded-2xl border border-border/70 bg-background/80 p-4"
             >
               <p className="text-sm font-semibold text-foreground">{domain.title}</p>
               <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
@@ -579,20 +741,20 @@ function renderCombinedSection(params: {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-5">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h3 className="text-base font-semibold text-foreground">Latest Signals</h3>
         <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-          <li className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+          <li className="rounded-xl border border-border/70 bg-background/80 px-3 py-2">
             Events:{" "}
-            {report.eventSummaryRows.length > 0
-              ? `${formatNumber(report.eventSummaryRows.length)} event records available.`
+            {eventRecordCount > 0
+              ? `${formatNumber(eventRecordCount)} event records available.`
               : "No event records yet."}
           </li>
-          <li className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
-            Inventory: {inventory.assessment.insights[0]?.message ?? "No inventory signal yet."}
+          <li className="rounded-xl border border-border/70 bg-background/80 px-3 py-2">
+            Inventory: {inventoryLeadInsight}
           </li>
-          <li className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
-            Assets: {assets.assessment.insights[0]?.message ?? "No asset signal yet."}
+          <li className="rounded-xl border border-border/70 bg-background/80 px-3 py-2">
+            Assets: {assetLeadInsight}
           </li>
         </ul>
       </section>
@@ -607,13 +769,26 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   }
 
   const canViewFinancial = context.role === "owner";
-  const [params, workspace, domainSignals] = await Promise.all([
+  const [params, workspace, domainSignals, domainState] =
+    await Promise.all([
     searchParams,
     getWorkspaceById(context.workspaceId),
     getDomainUsageSignals(context.workspaceId),
+    resolveWorkspaceDomainState(context.workspaceId),
   ]);
-  const defaultTab = mapDomainToReportTab(domainSignals.primaryDomain);
-  const tab = resolveTab(params.tab, defaultTab);
+  const primaryDomain = domainState.primarySurfaceDomain;
+  const defaultTab = mapDomainToReportTab(primaryDomain);
+  const allowedDomainTabs = new Set<ReportTab>(
+    domainState.enabledSurfaceDomains.map((domain) => mapDomainToReportTab(domain)),
+  );
+  const requestedTab = resolveTab(params.tab, defaultTab);
+  const tab =
+    requestedTab === "combined" || allowedDomainTabs.has(requestedTab)
+      ? requestedTab
+      : defaultTab;
+  const visibleTabs = TAB_ITEMS.filter(
+    (item) => item.key === "combined" || allowedDomainTabs.has(item.key),
+  );
 
   let section: ReactNode = null;
 
@@ -624,7 +799,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       canViewFinancial,
       timezone: workspace?.timezone,
       currency: workspace?.currency,
-      primaryDomain: domainSignals.primaryDomain,
+      primaryDomain,
     });
   } else if (tab === "inventory") {
     const inventory = await getInventoryPerformanceData();
@@ -657,20 +832,23 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_10px_28px_-22px_rgba(15,23,42,0.8)]">
+    <div className="space-y-7">
+      <header className="rounded-[1.85rem] border border-border/70 bg-gradient-to-br from-card via-card to-surface/80 p-6 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.88)]">
+        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          Analytics Workspace
+        </p>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Reports</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Cross-domain reporting with adaptive default focus based on current workspace usage.
+          Cross-domain reporting with persisted workspace domain focus and legacy heuristic fallback.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Primary domain:{" "}
           <span className="font-semibold text-foreground">
-            {domainLabel(domainSignals.primaryDomain)}
+            {domainLabel(primaryDomain)}
           </span>
         </p>
-        <nav className="mt-4 flex flex-wrap gap-2">
-          {TAB_ITEMS.map((item) => {
+        <nav className="mt-4 flex flex-wrap gap-2 rounded-2xl border border-border/70 bg-background/60 p-2">
+          {visibleTabs.map((item) => {
             const active = item.key === tab;
             return (
               <Link

@@ -30,12 +30,18 @@ type DashboardLayoutProps = {
   children: React.ReactNode;
   canAccessSettings: boolean;
   canAccessCalendar: boolean;
+  canAccessEvents: boolean;
+  canAccessInventory: boolean;
+  canAccessAssets: boolean;
 };
 
 export function DashboardLayout({
   children,
   canAccessSettings,
   canAccessCalendar,
+  canAccessEvents,
+  canAccessInventory,
+  canAccessAssets,
 }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -49,9 +55,24 @@ export function DashboardLayout({
       if (!canAccessCalendar) {
         items = items.filter((item) => item.href !== "/calendar");
       }
+      if (!canAccessEvents) {
+        items = items.filter((item) => item.href !== "/events");
+      }
+      if (!canAccessInventory) {
+        items = items.filter((item) => item.href !== "/inventory");
+      }
+      if (!canAccessAssets) {
+        items = items.filter((item) => item.href !== "/assets");
+      }
       return items;
     },
-    [canAccessSettings, canAccessCalendar],
+    [
+      canAccessSettings,
+      canAccessCalendar,
+      canAccessEvents,
+      canAccessInventory,
+      canAccessAssets,
+    ],
   );
 
   useEffect(() => {

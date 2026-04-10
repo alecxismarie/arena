@@ -3,6 +3,7 @@ import { eventPerformanceInsightAdapter } from "@/lib/domains/event-performance-
 import { inventoryPerformanceInsightAdapter } from "@/lib/domains/inventory-performance-adapter";
 import { AnalysisDomain } from "@/lib/domains/types";
 
+// Canonical deterministic insight adapter registry keyed by AnalysisDomain.
 export const deterministicInsightAdapters: Partial<
   Record<AnalysisDomain, unknown>
 > = {

@@ -247,6 +247,9 @@ async function main() {
     });
   }
 
+  // Deprecated legacy seed data.
+  // Canonical runtime inventory reporting uses DailyProductReport.
+  // Do not extend runtime inventory features on InventoryRecord.
   await prisma.inventoryRecord.createMany({
     data: [
       {

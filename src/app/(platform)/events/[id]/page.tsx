@@ -8,6 +8,12 @@ import { ChartCard } from "@/components/ui/chart-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { getEventById } from "@/lib/analytics";
 import { getAuthContext } from "@/lib/auth";
+import {
+  selectInsights,
+  selectRatioValue,
+  selectTotalValue,
+  selectTrendPoints,
+} from "@/lib/domains/metrics-selectors";
 import { formatCurrency, formatInTimezone, formatNumber } from "@/lib/utils";
 import { getWorkspaceById } from "@/lib/workspace";
 import { format } from "date-fns";
@@ -37,13 +43,53 @@ export default async function EventDetailPage({
     notFound();
   }
 
-  const { event, salesTrend, attendanceComparison, intelligence } = payload;
+  const { event, salesTrend, attendanceComparison, intelligence, domainMetrics } = payload;
+  const summaryRevenue = selectTotalValue(domainMetrics, "revenue", event.revenue);
+  const summaryTicketsSold = selectTotalValue(
+    domainMetrics,
+    "tickets_sold",
+    event.tickets_sold,
+  );
+  const summaryExpectedAttendance = selectTotalValue(
+    domainMetrics,
+    "expected_attendance",
+    event.expected_attendees,
+  );
+  const summaryActualAttendance = selectTotalValue(
+    domainMetrics,
+    "actual_attendance",
+    event.actual_attendees,
+  );
+  const summaryAttendanceRate = selectRatioValue(
+    domainMetrics,
+    "attendance_rate",
+    attendanceComparison.rate,
+  );
+  const summaryAttendanceVariance =
+    summaryActualAttendance - summaryExpectedAttendance;
+  const eventSalesTrendPoints = selectTrendPoints(domainMetrics, "daily_tickets");
+  const resolvedSalesTrend =
+    eventSalesTrendPoints.length > 0
+      ? eventSalesTrendPoints.map((point, index) => ({
+          label: point.label,
+          tickets: point.value,
+          revenue:
+            typeof point.meta?.revenue === "number"
+              ? point.meta.revenue
+              : (salesTrend[index]?.revenue ?? 0),
+        }))
+      : salesTrend;
+  const insightItems = selectInsights(domainMetrics);
+  const intelligenceMessage = insightItems[0]?.message ?? intelligence.message;
 
   return (
-    <div className="space-y-6">
-      <header className="rounded-3xl border border-border/60 bg-card/90 p-6 shadow-[0_8px_28px_-22px_rgba(15,23,42,0.8)]">
+    <div className="space-y-7">
+      <header className="rounded-[1.85rem] border border-border/70 bg-gradient-to-br from-card via-card to-surface/80 p-6 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.88)]">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              Event Snapshot
+            </p>
             <p className="text-sm text-muted-foreground">
               {formatInTimezone(event.date, workspace?.timezone, {
                 weekday: "long",
@@ -87,51 +133,51 @@ export default async function EventDetailPage({
 
       <section className={`grid gap-4 md:grid-cols-2 ${canViewFinancial ? "xl:grid-cols-3" : "xl:grid-cols-2"}`}>
         {canViewFinancial ? (
-          <article className="rounded-2xl border border-border/60 bg-card p-4">
+          <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Revenue</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
-              {formatCurrency(event.revenue, workspace?.currency)}
+              {formatCurrency(summaryRevenue, workspace?.currency)}
             </p>
           </article>
         ) : null}
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Tickets Sold</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(event.tickets_sold)}
+            {formatNumber(summaryTicketsSold)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Expected Attendance</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(event.expected_attendees)}
+            {formatNumber(summaryExpectedAttendance)}
           </p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Actual Attendance</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(event.actual_attendees)}
+            {formatNumber(summaryActualAttendance)}
           </p>
         </article>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Attendance Variance</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {formatNumber(attendanceComparison.variance)}
+            {formatNumber(summaryAttendanceVariance)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Actual attendance minus expected attendance</p>
         </article>
-        <article className="rounded-2xl border border-border/60 bg-card p-4">
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Attendance Rate</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
-            {(attendanceComparison.rate * 100).toFixed(1)}%
+            {(summaryAttendanceRate * 100).toFixed(1)}%
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Actual attendance divided by expected attendance</p>
         </article>
       </section>
 
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <header>
           <h2 className="text-lg font-semibold text-foreground">Event Intelligence</h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -140,7 +186,7 @@ export default async function EventDetailPage({
         </header>
 
         <div className="mt-4 space-y-4">
-          <p className="text-sm text-muted-foreground">{intelligence.message}</p>
+          <p className="text-sm text-muted-foreground">{intelligenceMessage}</p>
 
           {intelligence.insufficientData ? (
             <p className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-sm text-muted-foreground">
@@ -222,7 +268,7 @@ export default async function EventDetailPage({
                     </thead>
                     <tbody>
                       {intelligence.trend.map((row) => (
-                        <tr key={row.id} className="rounded-xl bg-muted/35 text-foreground">
+                        <tr key={row.id} className="rounded-xl bg-background/80 text-foreground">
                           <td className="rounded-l-xl px-2 py-2">
                             {formatInTimezone(row.date, workspace?.timezone, {
                               month: "short",
@@ -252,7 +298,7 @@ export default async function EventDetailPage({
           title="Event Performance"
           subtitle="Current tickets sold and revenue"
         >
-          <EventSalesMiniChart data={salesTrend} currency={workspace?.currency} />
+          <EventSalesMiniChart data={resolvedSalesTrend} currency={workspace?.currency} />
         </ChartCard>
       ) : (
         <ChartCard
@@ -260,7 +306,7 @@ export default async function EventDetailPage({
           subtitle="Current tickets sold trend"
         >
           <SalesTrendChart
-            data={salesTrend.map((point) => ({
+            data={resolvedSalesTrend.map((point) => ({
               label: point.label,
               tickets: point.tickets,
             }))}

@@ -1,5 +1,8 @@
 import { requireAuthContext } from "@/lib/auth";
-import { inventoryPerformanceInsightAdapter } from "@/lib/domains/inventory-performance-adapter";
+import {
+  getInventoryPerformanceMetrics,
+  mapInventoryPerformanceMetricsToLegacyAssessment,
+} from "@/lib/domains/inventory-performance-metrics";
 import { computeDailyInventoryFinancials } from "@/lib/inventory/computation";
 import { buildDailyBusinessSummary } from "@/lib/inventory/daily-summary";
 import {
@@ -8,6 +11,13 @@ import {
   ProductItem,
 } from "@/lib/inventory/types";
 import { prisma } from "@/lib/prisma";
+
+// Canonical runtime inventory analytics source:
+// - DailyProductReport (finalized closing records)
+//
+// Legacy model retained for backward compatibility/deferred cleanup:
+// - InventoryRecord (deprecated for runtime reporting paths)
+// - Do not add new runtime analytics reads against InventoryRecord.
 
 function toNumber(value: unknown) {
   if (typeof value === "number") return value;
@@ -256,17 +266,20 @@ export async function getInventoryPerformanceData() {
     fetchProductsForWorkspace(context.workspaceId),
     fetchDailyReportsForWorkspace(context.workspaceId),
   ]);
-
+  const domainMetricsResult = getInventoryPerformanceMetrics({
+    products,
+    reports,
+  });
   const assessment =
-    inventoryPerformanceInsightAdapter.computeDeterministicInsights({
-      products,
-      reports,
-    });
+    mapInventoryPerformanceMetricsToLegacyAssessment(domainMetricsResult);
 
   return {
     products,
     reports,
     assessment,
+    // Additive compatibility surface: existing callers can ignore this while
+    // standardized inventory contract adoption expands across pages.
+    domainMetrics: domainMetricsResult.metrics,
   };
 }
 

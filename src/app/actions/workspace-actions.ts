@@ -15,6 +15,10 @@ import {
   isAllowedWorkspaceCurrency,
   isAllowedWorkspaceTimezone,
 } from "@/lib/workspace-options";
+import {
+  normalizeWorkspaceDomainConfigForPersistence,
+  serializeEnabledDomainsForStorage,
+} from "@/lib/workspace-domain-config";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -177,6 +181,30 @@ export async function updateWorkspaceAction(formData: FormData) {
   });
 
   revalidatePath("/dashboard");
+  revalidatePath("/settings");
+}
+
+export async function updateWorkspaceDomainConfigAction(formData: FormData) {
+  const context = await requireAuthContext();
+  assertOwner(context);
+
+  const normalized = normalizeWorkspaceDomainConfigForPersistence({
+    enabledDomainInputs: formData
+      .getAll("enabled_domains")
+      .map((value) => String(value ?? "")),
+    primaryDomainInput: String(formData.get("primary_domain") ?? ""),
+  });
+
+  await prisma.workspace.update({
+    where: { id: context.workspaceId },
+    data: {
+      primary_domain: normalized.primaryDomain,
+      enabled_domains: serializeEnabledDomainsForStorage(normalized.enabledDomains),
+    },
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/reports");
   revalidatePath("/settings");
 }
 

@@ -10,6 +10,8 @@ export const getWorkspaceById = cache(async function getWorkspaceById(workspaceI
       name: true,
       timezone: true,
       currency: true,
+      primary_domain: true,
+      enabled_domains: true,
       created_at: true,
       updated_at: true,
     },

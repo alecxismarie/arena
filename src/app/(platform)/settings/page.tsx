@@ -1,8 +1,10 @@
 import { AccountSettingsForm } from "@/components/settings/account-settings-form";
 import { TeamMembersForm } from "@/components/settings/team-members-form";
+import { WorkspaceDomainSettingsForm } from "@/components/settings/workspace-domain-settings-form";
 import { WorkspaceSettingsForm } from "@/components/settings/workspace-settings-form";
 import { assertOwner } from "@/lib/access-control";
 import { getAuthContext } from "@/lib/auth";
+import { resolveWorkspaceDomainState } from "@/lib/workspace-domain-config";
 import { prisma } from "@/lib/prisma";
 import {
   WORKSPACE_CURRENCY_OPTIONS,
@@ -28,7 +30,7 @@ export default async function SettingsPage() {
     redirect("/dashboard");
   }
 
-  const [workspace, account, memberships] = await Promise.all([
+  const [workspace, account, memberships, domainState] = await Promise.all([
     getWorkspaceById(context.workspaceId),
     prisma.user.findUnique({
       where: {
@@ -62,6 +64,7 @@ export default async function SettingsPage() {
         },
       },
     }),
+    resolveWorkspaceDomainState(context.workspaceId),
   ]);
   const selectedTimezone = resolveWorkspaceTimezone(workspace?.timezone);
   const selectedCurrency = resolveWorkspaceCurrency(workspace?.currency);
@@ -126,6 +129,18 @@ export default async function SettingsPage() {
             role: membership.role,
             isCurrentUser: membership.user.id === context.userId,
           }))}
+        />
+      </section>
+
+      <section className="rounded-3xl border border-border/60 bg-card/90 p-5">
+        <h2 className="text-lg font-semibold text-foreground">Domain Configuration</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Set enabled domains and choose the primary workspace focus.
+        </p>
+        <WorkspaceDomainSettingsForm
+          defaultPrimaryDomain={domainState.primaryDomain}
+          defaultEnabledDomains={domainState.enabledDomains}
+          hasPersistedConfig={domainState.config.hasPersistedConfig}
         />
       </section>
     </div>

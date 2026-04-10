@@ -1,6 +1,9 @@
 import { requireAuthContext } from "@/lib/auth";
 import { AssetRecordItem } from "@/lib/asset/types";
-import { assetUtilizationInsightAdapter } from "@/lib/domains/asset-utilization-adapter";
+import {
+  getAssetUtilizationMetrics,
+  mapAssetUtilizationMetricsToLegacyAssessment,
+} from "@/lib/domains/asset-utilization-metrics";
 import { prisma } from "@/lib/prisma";
 
 function toNumber(value: unknown) {
@@ -58,12 +61,17 @@ export async function getAssetRecords() {
 
 export async function getAssetUtilizationData() {
   const records = await getAssetRecords();
-  const assessment = assetUtilizationInsightAdapter.computeDeterministicInsights({
+  const domainMetricsResult = getAssetUtilizationMetrics({
     records,
   });
+  const assessment =
+    mapAssetUtilizationMetricsToLegacyAssessment(domainMetricsResult);
 
   return {
     records,
     assessment,
+    // Additive compatibility surface: existing callers can ignore this while
+    // standardized asset contract adoption expands across pages.
+    domainMetrics: domainMetricsResult.metrics,
   };
 }

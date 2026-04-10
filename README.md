@@ -1,6 +1,6 @@
 # Signals Dashboard (Phase 1 MVP)
 
-Signals is an event performance intelligence platform for live event operations and helps you understand how your events truly perform.
+Signals is an operations intelligence platform spanning event performance, inventory performance, and asset utilization.
 
 ## Stack
 
@@ -20,13 +20,30 @@ Signals is an event performance intelligence platform for live event operations 
 - Reports (weekly sales, monthly sales, attendance, revenue, event summary)
 - Seeded realistic events + ticket sales + attendance logs
 
+## Domain Foundation
+
+Canonical domain ids:
+
+- `event_performance`
+- `inventory_performance`
+- `asset_utilization`
+
+Workspace domain configuration:
+
+- persisted on `Workspace.primary_domain` and `Workspace.enabled_domains`
+- if config is absent, runtime falls back to legacy heuristic/default behavior
+
 ## Data Models
 
 - `User`
 - `Venue`
 - `Event`
-- `TicketSale`
-- `AttendanceLog`
+- `TicketSale` (optional raw event logs)
+- `AttendanceLog` (optional raw event logs)
+- `Product`
+- `DailyProductReport` (canonical runtime inventory reporting source)
+- `InventoryRecord` (deprecated legacy inventory table)
+- `AssetRecord`
 
 Revenue is modeled as:
 

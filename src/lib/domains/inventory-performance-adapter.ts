@@ -11,6 +11,10 @@ type InventoryPerformanceInsightInput = {
   reports: DailyProductReportItem[];
 };
 
+// Inventory deterministic insight adapter retained for compatibility.
+// Phase 2B standardized metrics are implemented in
+// src/lib/domains/inventory-performance-metrics.ts and wrap this adapter.
+
 function roundTo(value: number, decimals: number) {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;

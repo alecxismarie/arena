@@ -9,6 +9,10 @@ type AssetUtilizationInsightInput = {
   records: AssetRecordItem[];
 };
 
+// Asset deterministic insight adapter retained for compatibility.
+// Phase 2C standardized metrics are implemented in
+// src/lib/domains/asset-utilization-metrics.ts and wrap this adapter.
+
 function roundTo(value: number, decimals: number) {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;

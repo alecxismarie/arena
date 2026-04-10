@@ -1,9 +1,12 @@
 import "server-only";
 
 import { subDays } from "date-fns";
+import { LegacySurfaceDomain } from "@/lib/domains/types";
 import { prisma } from "@/lib/prisma";
 
-export type DomainKey = "events" | "inventory" | "assets";
+// Legacy UI surface keys retained for backward compatibility.
+// Canonical persisted domain identifiers live in src/lib/domains/types.ts.
+export type DomainKey = LegacySurfaceDomain;
 
 export type DomainUsageSignals = {
   primaryDomain: DomainKey;
@@ -48,6 +51,9 @@ function resolvePrimaryDomain(scores: Record<DomainKey, number>): DomainKey {
 export async function getDomainUsageSignals(
   workspaceId: string,
 ): Promise<DomainUsageSignals> {
+  // Heuristic-only scoring fallback.
+  // Explicit workspace domain configuration is resolved in
+  // src/lib/workspace-domain-config.ts and should be preferred when present.
   const recentFrom = subDays(new Date(), 30);
 
   const [

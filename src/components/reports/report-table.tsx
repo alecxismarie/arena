@@ -99,7 +99,7 @@ export function ReportTable({
   );
 
   return (
-    <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.7)]">
+    <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-base font-semibold text-foreground">Event Performance Table</h3>
@@ -150,7 +150,7 @@ export function ReportTable({
           </thead>
           <tbody>
             {sortedRows.map((row) => (
-              <tr key={row.id} className="rounded-xl bg-muted/35 text-foreground">
+              <tr key={row.id} className="rounded-xl bg-background/70 text-foreground shadow-[0_1px_0_rgba(31,23,17,0.04)]">
                 <td className="rounded-l-xl px-3 py-3 font-medium">{row.name}</td>
                 <td className="px-3 py-3 text-muted-foreground">
                   {formatInTimezone(row.date, timezone, {

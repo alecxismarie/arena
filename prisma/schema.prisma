@@ -37,6 +37,14 @@ model Workspace {
   name             String
   timezone         String                   @default("UTC")
   currency         String                   @default("USD")
+  /// Canonical domain id (event_performance | inventory_performance | asset_utilization).
+  /// Nullable to preserve backward-compatible fallback behavior.
+  /// Input normalization is enforced in src/lib/workspace-domain-config.ts.
+  primary_domain   String?
+  /// Canonical enabled domain ids persisted as JSON array.
+  /// Nullable means no explicit config and heuristic/default fallback applies.
+  /// Input normalization is enforced in src/lib/workspace-domain-config.ts.
+  enabled_domains  Json?
   created_at       DateTime                 @default(now())
   updated_at       DateTime                 @updatedAt
   venues           Venue[]
@@ -168,6 +176,9 @@ model AttendanceLog {
 }
 
 model InventoryRecord {
+  /// Deprecated for runtime analytics.
+  /// Canonical runtime inventory reporting uses DailyProductReport.
+  /// Do not extend new runtime reporting features on this model.
   id              String    @id @default(cuid())
   workspace_id    String
   product_name    String

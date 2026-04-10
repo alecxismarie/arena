@@ -6,8 +6,15 @@ import {
 } from "@/components/charts/dashboard-charts";
 import { ChartCard } from "@/components/ui/chart-card";
 import { StatCard } from "@/components/ui/stat-card";
+import { toTrend } from "@/lib/analytics/metrics";
 import { getDashboardData } from "@/lib/analytics";
 import { getAuthContext } from "@/lib/auth";
+import {
+  selectRanking,
+  selectRatioValue,
+  selectTotalValue,
+  selectTrendPoints,
+} from "@/lib/domains/metrics-selectors";
 import { prisma } from "@/lib/prisma";
 import { formatNumber } from "@/lib/utils";
 import { getWorkspaceById } from "@/lib/workspace";
@@ -67,8 +74,144 @@ export default async function DashboardPage() {
   const canViewFinancial = context.role === "owner";
   const accountLabel = account?.name?.trim() || "User";
   const workspaceLabel = workspace?.name ?? "No workspace";
-  const totalEvents =
-    data.stats.find((stat) => stat.key === "events")?.value ?? 0;
+  const eventDomainMetrics = data.domainMetrics;
+  const legacyStatsByKey = new Map(data.stats.map((stat) => [stat.key, stat]));
+  const eventStats = [
+    {
+      key: "events" as const,
+      label: "Total Events",
+      value: selectTotalValue(
+        eventDomainMetrics,
+        "total_events",
+        legacyStatsByKey.get("events")?.value ?? 0,
+      ),
+      change: selectRatioValue(
+        eventDomainMetrics,
+        "week_over_week_events_change",
+        legacyStatsByKey.get("events")?.change ?? 0,
+      ),
+    },
+    {
+      key: "tickets" as const,
+      label: "Tickets Sold",
+      value: selectTotalValue(
+        eventDomainMetrics,
+        "tickets_sold",
+        legacyStatsByKey.get("tickets")?.value ?? 0,
+      ),
+      change: selectRatioValue(
+        eventDomainMetrics,
+        "week_over_week_tickets_change",
+        legacyStatsByKey.get("tickets")?.change ?? 0,
+      ),
+    },
+    {
+      key: "attendance" as const,
+      label: "Actual Attendance",
+      value: selectTotalValue(
+        eventDomainMetrics,
+        "actual_attendance",
+        legacyStatsByKey.get("attendance")?.value ?? 0,
+      ),
+      change: selectRatioValue(
+        eventDomainMetrics,
+        "week_over_week_attendance_change",
+        legacyStatsByKey.get("attendance")?.change ?? 0,
+      ),
+    },
+    {
+      key: "revenue" as const,
+      label: "Revenue",
+      value: selectTotalValue(
+        eventDomainMetrics,
+        "revenue",
+        legacyStatsByKey.get("revenue")?.value ?? 0,
+      ),
+      change: selectRatioValue(
+        eventDomainMetrics,
+        "week_over_week_revenue_change",
+        legacyStatsByKey.get("revenue")?.change ?? 0,
+      ),
+    },
+  ].map((stat) => ({
+    ...stat,
+    trend: toTrend(stat.change),
+  }));
+  const totalEvents = eventStats.find((stat) => stat.key === "events")?.value ?? 0;
+  const attendanceExpected = selectTotalValue(
+    eventDomainMetrics,
+    "expected_attendance",
+    data.attendanceComparison.expected,
+  );
+  const attendanceActual = selectTotalValue(
+    eventDomainMetrics,
+    "actual_attendance",
+    data.attendanceComparison.actual,
+  );
+  const attendanceRate = selectRatioValue(
+    eventDomainMetrics,
+    "attendance_rate",
+    data.attendanceComparison.rate,
+  );
+  const attendanceVariance = attendanceActual - attendanceExpected;
+  const weeklyRevenueTrend = selectTrendPoints(
+    eventDomainMetrics,
+    "weekly_revenue",
+  );
+  const dashboardWeeklyRevenueTrend =
+    weeklyRevenueTrend.length > 0
+      ? weeklyRevenueTrend.map((point) => ({
+          label: point.label,
+          revenue: point.value,
+        }))
+      : data.weeklyRevenueTrend;
+  const monthlyRevenueTrend = selectTrendPoints(
+    eventDomainMetrics,
+    "monthly_revenue",
+  );
+  const dashboardMonthlyRevenueTrend =
+    monthlyRevenueTrend.length > 0
+      ? monthlyRevenueTrend.map((point) => ({
+          label: point.label,
+          revenue: point.value,
+        }))
+      : data.monthlyRevenueTrend;
+  const dailyTicketsTrend = selectTrendPoints(eventDomainMetrics, "daily_tickets");
+  const dashboardSalesTrend =
+    dailyTicketsTrend.length > 0
+      ? dailyTicketsTrend.map((point) => ({
+          label: point.label,
+          tickets: point.value,
+        }))
+      : data.salesTrend;
+  const attendanceRanking = selectRanking(
+    eventDomainMetrics,
+    "attendance_by_event",
+  );
+  const dashboardAttendanceByEvent =
+    attendanceRanking.length > 0
+      ? attendanceRanking.map((row) => ({
+          id: row.id,
+          name: row.label,
+          attendance: row.value,
+        }))
+      : data.attendanceByEvent.map((row) => ({
+          id: row.id,
+          name: row.name,
+          attendance: row.attendance,
+        }));
+  const ticketDistributionRanking = selectRanking(
+    eventDomainMetrics,
+    "ticket_distribution",
+  );
+  const dashboardTicketDistribution =
+    ticketDistributionRanking.length > 0
+      ? ticketDistributionRanking.map((row) => ({
+          id: row.id,
+          name: row.label,
+          tickets: row.value,
+        }))
+      : data.ticketDistribution;
   const domainCards = [
     {
       key: "events",
@@ -158,8 +301,11 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_8px_24px_-22px_rgba(15,23,42,0.8)]">
+    <div className="space-y-7">
+      <header className="rounded-[1.85rem] border border-border/70 bg-gradient-to-br from-card via-card to-surface/80 p-6 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.88)]">
+        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          Workspace Control Plane
+        </p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
           Workspace overview
         </h1>
@@ -174,7 +320,7 @@ export default async function DashboardPage() {
         </p>
       </header>
 
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h2 className="text-base font-semibold text-foreground">Domain overview</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Current record coverage across implemented domains.
@@ -183,7 +329,7 @@ export default async function DashboardPage() {
           {domainCards.map((domain) => (
             <article
               key={domain.key}
-              className="rounded-2xl border border-border/60 bg-background/70 p-4"
+              className="rounded-2xl border border-border/70 bg-background/80 p-4 shadow-[0_8px_20px_-20px_rgba(15,23,42,0.75)]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -211,7 +357,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+      <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h2 className="text-base font-semibold text-foreground">Operations pulse</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Domain-neutral operational status, attention items, and quick actions.
@@ -221,7 +367,7 @@ export default async function DashboardPage() {
             {domainStatuses.map((domain) => (
               <article
                 key={domain.key}
-                className="rounded-2xl border border-border/60 bg-background/70 p-3"
+                className="rounded-2xl border border-border/70 bg-background/80 p-3"
               >
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">{domain.label}</p>
                 <p
@@ -241,7 +387,7 @@ export default async function DashboardPage() {
               {attentionItems.map((item) => (
                 <li
                   key={item}
-                  className="rounded-xl border border-border/70 bg-background/70 px-3 py-2"
+                  className="rounded-xl border border-border/70 bg-background/80 px-3 py-2"
                 >
                   {item}
                 </li>
@@ -280,7 +426,7 @@ export default async function DashboardPage() {
       {totalEvents > 0 ? (
         <>
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {data.stats
+            {eventStats
               .filter((stat) => canViewFinancial || stat.key !== "revenue")
               .map((stat) => (
                 <StatCard
@@ -296,7 +442,7 @@ export default async function DashboardPage() {
               ))}
           </section>
 
-          <section className="rounded-3xl border border-border/60 bg-card/90 p-5 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.75)]">
+          <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-5 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
             <h2 className="text-base font-semibold text-foreground">
               Event attendance: expected vs actual
             </h2>
@@ -304,30 +450,30 @@ export default async function DashboardPage() {
               Compare planned turnout with actual attendance across events.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <article className="rounded-2xl border border-border/60 bg-background/70 p-3">
+              <article className="rounded-2xl border border-border/70 bg-background/80 p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Expected</p>
                 <p className="mt-1 text-xl font-semibold text-foreground">
-                  {formatNumber(data.attendanceComparison.expected)}
+                  {formatNumber(attendanceExpected)}
                 </p>
               </article>
-              <article className="rounded-2xl border border-border/60 bg-background/70 p-3">
+              <article className="rounded-2xl border border-border/70 bg-background/80 p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Actual</p>
                 <p className="mt-1 text-xl font-semibold text-foreground">
-                  {formatNumber(data.attendanceComparison.actual)}
+                  {formatNumber(attendanceActual)}
                 </p>
               </article>
-              <article className="rounded-2xl border border-border/60 bg-background/70 p-3">
+              <article className="rounded-2xl border border-border/70 bg-background/80 p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Variance</p>
                 <p className="mt-1 text-xl font-semibold text-foreground">
-                  {formatNumber(data.attendanceComparison.variance)}
+                  {formatNumber(attendanceVariance)}
                 </p>
               </article>
-              <article className="rounded-2xl border border-border/60 bg-background/70 p-3">
+              <article className="rounded-2xl border border-border/70 bg-background/80 p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
                   Attendance Rate
                 </p>
                 <p className="mt-1 text-xl font-semibold text-foreground">
-                  {(data.attendanceComparison.rate * 100).toFixed(1)}%
+                  {(attendanceRate * 100).toFixed(1)}%
                 </p>
               </article>
             </div>
@@ -341,8 +487,8 @@ export default async function DashboardPage() {
                 className="xl:col-span-4"
               >
                 <RevenueTrendChart
-                  weekly={data.weeklyRevenueTrend}
-                  monthly={data.monthlyRevenueTrend}
+                  weekly={dashboardWeeklyRevenueTrend}
+                  monthly={dashboardMonthlyRevenueTrend}
                   currency={workspace?.currency}
                 />
               </ChartCard>
@@ -352,7 +498,7 @@ export default async function DashboardPage() {
                 subtitle="Tickets sold by event"
                 className="xl:col-span-3"
               >
-                <TicketDistributionChart data={data.ticketDistribution} />
+                <TicketDistributionChart data={dashboardTicketDistribution} />
               </ChartCard>
             </section>
           ) : (
@@ -361,7 +507,7 @@ export default async function DashboardPage() {
                 title="Ticket Distribution"
                 subtitle="Tickets sold by event"
               >
-                <TicketDistributionChart data={data.ticketDistribution} />
+                <TicketDistributionChart data={dashboardTicketDistribution} />
               </ChartCard>
             </section>
           )}
@@ -372,7 +518,7 @@ export default async function DashboardPage() {
               subtitle="Events ranked by actual attendance"
               className="xl:col-span-4"
             >
-              <AttendanceByEventChart data={data.attendanceByEvent} />
+              <AttendanceByEventChart data={dashboardAttendanceByEvent} />
             </ChartCard>
 
             <ChartCard
@@ -380,7 +526,7 @@ export default async function DashboardPage() {
               subtitle="Tickets sold over the last 30 days"
               className="xl:col-span-3"
             >
-              <SalesTrendChart data={data.salesTrend} />
+              <SalesTrendChart data={dashboardSalesTrend} />
             </ChartCard>
           </section>
         </>
