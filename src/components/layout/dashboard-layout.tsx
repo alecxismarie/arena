@@ -14,7 +14,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -45,6 +45,7 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const prefetchedRoutesRef = useRef<Set<string>>(new Set());
 
   const visibleNavItems = useMemo(
     () => {
@@ -75,16 +76,18 @@ export function DashboardLayout({
     ],
   );
 
-  useEffect(() => {
-    visibleNavItems.forEach((item) => {
-      const isCurrentPath =
-        pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-      if (!isCurrentPath) {
-        router.prefetch(item.href);
+  const prefetchRoute = useCallback(
+    (href: string) => {
+      // Avoid eager prefetching every route on each navigation.
+      // Prefetch on interaction keeps transitions quick with lower background load.
+      if (prefetchedRoutesRef.current.has(href)) {
+        return;
       }
-    });
-  }, [pathname, router, visibleNavItems]);
+      prefetchedRoutesRef.current.add(href);
+      router.prefetch(href);
+    },
+    [router],
+  );
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_0%_0%,rgba(231,150,21,0.16),transparent_38%),radial-gradient(circle_at_100%_0%,rgba(80,56,39,0.09),transparent_36%),linear-gradient(180deg,var(--color-surface),var(--color-surface-soft))] text-foreground">
@@ -113,8 +116,8 @@ export function DashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  onMouseEnter={() => router.prefetch(item.href)}
-                  onFocus={() => router.prefetch(item.href)}
+                  onMouseEnter={() => prefetchRoute(item.href)}
+                  onFocus={() => prefetchRoute(item.href)}
                   className={cn(
                     "group flex items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-sm transition-all",
                     active
@@ -154,8 +157,8 @@ export function DashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  onMouseEnter={() => router.prefetch(item.href)}
-                  onFocus={() => router.prefetch(item.href)}
+                  onMouseEnter={() => prefetchRoute(item.href)}
+                  onFocus={() => prefetchRoute(item.href)}
                   className={cn(
                     "inline-flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium",
                     active

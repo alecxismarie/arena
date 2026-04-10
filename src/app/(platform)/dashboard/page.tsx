@@ -303,15 +303,9 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-7">
       <header className="rounded-[1.85rem] border border-border/70 bg-gradient-to-br from-card via-card to-surface/80 p-6 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.88)]">
-        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          Workspace Control Plane
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
           Workspace overview
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Review current domain coverage and monitor event analytics where event data exists.
-        </p>
         <p className="mt-2 text-sm text-muted-foreground">
           Workspace: <span className="font-semibold text-accent">{workspaceLabel}</span>
         </p>
