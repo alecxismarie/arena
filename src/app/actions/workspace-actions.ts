@@ -18,8 +18,11 @@ import {
 import {
   normalizeWorkspaceDomainConfigForPersistence,
   serializeEnabledDomainsForStorage,
+  getWorkspaceDomainConfigCacheTag,
 } from "@/lib/workspace-domain-config";
-import { revalidatePath } from "next/cache";
+import { getDomainUsageCacheTag } from "@/lib/domain-focus";
+import { getWorkspaceCacheTag } from "@/lib/workspace";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 function parseWorkspaceName(value: FormDataEntryValue | null) {
@@ -180,6 +183,7 @@ export async function updateWorkspaceAction(formData: FormData) {
     },
   });
 
+  revalidateTag(getWorkspaceCacheTag(context.workspaceId), "max");
   revalidatePath("/dashboard");
   revalidatePath("/settings");
 }
@@ -203,6 +207,8 @@ export async function updateWorkspaceDomainConfigAction(formData: FormData) {
     },
   });
 
+  revalidateTag(getWorkspaceDomainConfigCacheTag(context.workspaceId), "max");
+  revalidateTag(getDomainUsageCacheTag(context.workspaceId), "max");
   revalidatePath("/dashboard");
   revalidatePath("/reports");
   revalidatePath("/settings");

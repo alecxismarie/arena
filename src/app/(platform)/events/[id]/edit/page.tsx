@@ -5,8 +5,6 @@ import { getAuthContext } from "@/lib/auth";
 import { getWorkspaceById } from "@/lib/workspace";
 import { notFound, redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
 export default async function EditEventPage({
   params,
 }: {

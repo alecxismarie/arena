@@ -4,7 +4,6 @@ import { getCalendarNavAvailability } from "@/lib/domain-focus";
 import { resolveWorkspaceDomainState } from "@/lib/workspace-domain-config";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
 
 export default async function PlatformLayout({
   children,

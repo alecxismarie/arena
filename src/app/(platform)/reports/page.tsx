@@ -25,8 +25,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-export const dynamic = "force-dynamic";
-
 type ReportsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -39,6 +37,7 @@ const TAB_ITEMS: Array<{ key: ReportTab; label: string }> = [
   { key: "assets", label: "Assets" },
   { key: "combined", label: "Combined Overview" },
 ];
+const EVENT_TABLE_PAGE_SIZE = 30;
 
 function resolveTab(raw: string | string[] | undefined, fallback: ReportTab): ReportTab {
   const normalized = Array.isArray(raw) ? raw[0] : raw;
@@ -49,8 +48,34 @@ function resolveTab(raw: string | string[] | undefined, fallback: ReportTab): Re
   return fallback;
 }
 
+function parsePositiveInt(raw: string | string[] | undefined, fallback: number) {
+  const normalized = Array.isArray(raw) ? raw[0] : raw;
+  if (!normalized) return fallback;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+}
+
+function reportsHref(params: {
+  tab: ReportTab;
+  defaultTab: ReportTab;
+  page?: number;
+}) {
+  const query = new URLSearchParams();
+  if (params.tab !== params.defaultTab) {
+    query.set("tab", params.tab);
+  }
+  if (params.page && params.page > 1) {
+    query.set("page", String(params.page));
+  }
+  const serialized = query.toString();
+  return serialized ? `/reports?${serialized}` : "/reports";
+}
+
 function tabHref(tab: ReportTab, defaultTab: ReportTab) {
-  return tab === defaultTab ? "/reports" : `/reports?tab=${tab}`;
+  return reportsHref({ tab, defaultTab });
 }
 
 function domainLabel(domain: LegacySurfaceDomain) {
@@ -101,8 +126,24 @@ function renderEventsSection(params: {
   timezone?: string;
   currency?: string;
   primaryDomain: LegacySurfaceDomain;
+  tablePage: number;
+  tablePageCount: number;
+  tableTotalCount: number;
+  tablePageSize: number;
+  buildPageHref: (page: number) => string;
 }) {
-  const { report, canViewFinancial, timezone, currency, primaryDomain } = params;
+  const {
+    report,
+    canViewFinancial,
+    timezone,
+    currency,
+    primaryDomain,
+    tablePage,
+    tablePageCount,
+    tableTotalCount,
+    tablePageSize,
+    buildPageHref,
+  } = params;
   const primaryAction = primaryDomainAction(primaryDomain);
   const domainMetrics = report.domainMetrics;
   const weeklySalesTrend = selectTrendPoints(domainMetrics, "weekly_sales");
@@ -168,7 +209,7 @@ function renderEventsSection(params: {
         }))
       : report.revenueReport;
 
-  if (report.eventSummaryRows.length === 0) {
+  if (report.eventSummaryRowCount === 0) {
     return (
       <section className="rounded-[1.75rem] border border-border/70 bg-gradient-to-b from-card to-card/92 p-6 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.82)]">
         <h2 className="text-lg font-semibold text-foreground">No event reports yet</h2>
@@ -293,6 +334,44 @@ function renderEventsSection(params: {
         timezone={timezone}
         currency={currency}
       />
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+        <span>
+          Showing{" "}
+          {tableTotalCount === 0
+            ? "0"
+            : `${(tablePage - 1) * tablePageSize + 1}-${Math.min(tablePage * tablePageSize, tableTotalCount)}`}{" "}
+          of {formatNumber(tableTotalCount)} events
+        </span>
+        <div className="flex items-center gap-2">
+          {tablePage > 1 ? (
+            <Link
+              href={buildPageHref(tablePage - 1)}
+              className="btn-secondary rounded-lg px-3 py-1.5 text-xs font-medium"
+            >
+              Previous
+            </Link>
+          ) : (
+            <span className="rounded-lg border border-border/40 px-3 py-1.5 text-muted-foreground/60">
+              Previous
+            </span>
+          )}
+          <span>
+            Page {tablePage} of {tablePageCount}
+          </span>
+          {tablePage < tablePageCount ? (
+            <Link
+              href={buildPageHref(tablePage + 1)}
+              className="btn-secondary rounded-lg px-3 py-1.5 text-xs font-medium"
+            >
+              Next
+            </Link>
+          ) : (
+            <span className="rounded-lg border border-border/40 px-3 py-1.5 text-muted-foreground/60">
+              Next
+            </span>
+          )}
+        </div>
+      </div>
     </>
   );
 }
@@ -789,17 +868,37 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const visibleTabs = TAB_ITEMS.filter(
     (item) => item.key === "combined" || allowedDomainTabs.has(item.key),
   );
+  const eventTableRequestedPage = parsePositiveInt(params.page, 1);
 
   let section: ReactNode = null;
 
   if (tab === "events") {
-    const report = await getReportsData();
+    const report = await getReportsData({
+      tablePage: eventTableRequestedPage,
+      tablePageSize: EVENT_TABLE_PAGE_SIZE,
+      includeEventSummaryRows: true,
+    });
+    const eventTablePageCount = Math.max(
+      1,
+      Math.ceil(report.eventSummaryRowCount / EVENT_TABLE_PAGE_SIZE),
+    );
+    const eventTablePage = Math.min(eventTableRequestedPage, eventTablePageCount);
     section = renderEventsSection({
       report,
       canViewFinancial,
       timezone: workspace?.timezone,
       currency: workspace?.currency,
       primaryDomain,
+      tablePage: eventTablePage,
+      tablePageCount: eventTablePageCount,
+      tableTotalCount: report.eventSummaryRowCount,
+      tablePageSize: EVENT_TABLE_PAGE_SIZE,
+      buildPageHref: (page) =>
+        reportsHref({
+          tab: "events",
+          defaultTab,
+          page,
+        }),
     });
   } else if (tab === "inventory") {
     const inventory = await getInventoryPerformanceData();
@@ -818,7 +917,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     });
   } else {
     const [report, inventory, assets] = await Promise.all([
-      getReportsData(),
+      getReportsData({
+        includeEventSummaryRows: false,
+      }),
       getInventoryPerformanceData(),
       getAssetUtilizationData(),
     ]);

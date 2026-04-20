@@ -1,12 +1,16 @@
 import { setProductStatusAction } from "@/app/actions/inventory-actions";
 import { getAuthContext } from "@/lib/auth";
-import { getInventoryProducts } from "@/lib/inventory";
+import { getInventoryProductsPage } from "@/lib/inventory";
 import { formatCurrency, formatInTimezone } from "@/lib/utils";
 import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+type InventoryProductsPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+const INVENTORY_PRODUCTS_PAGE_SIZE = 25;
 
 function statusClass(isActive: boolean) {
   return isActive
@@ -14,17 +18,33 @@ function statusClass(isActive: boolean) {
     : "border-amber-200 bg-amber-50 text-amber-700";
 }
 
-export default async function InventoryProductsPage() {
+function parsePage(raw: string | string[] | undefined) {
+  const normalized = Array.isArray(raw) ? raw[0] : raw;
+  if (!normalized) return 1;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.floor(parsed);
+}
+
+export default async function InventoryProductsPage({
+  searchParams,
+}: InventoryProductsPageProps) {
   const context = await getAuthContext();
   if (!context) {
     redirect("/");
   }
 
+  const params = await searchParams;
+  const requestedPage = parsePage(params.page);
   const canViewFinancial = context.role === "owner";
-  const [products, workspace] = await Promise.all([
-    getInventoryProducts(),
+  const [productsPage, workspace] = await Promise.all([
+    getInventoryProductsPage({
+      page: requestedPage,
+      pageSize: INVENTORY_PRODUCTS_PAGE_SIZE,
+    }),
     getWorkspaceById(context.workspaceId),
   ]);
+  const products = productsPage.products;
 
   return (
     <div className="space-y-6">
@@ -145,6 +165,45 @@ export default async function InventoryProductsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+            <span>
+              Showing{" "}
+              {`${(productsPage.page - 1) * productsPage.pageSize + 1}-${Math.min(
+                productsPage.page * productsPage.pageSize,
+                productsPage.totalCount,
+              )}`}{" "}
+              of {productsPage.totalCount} products
+            </span>
+            <div className="flex items-center gap-2">
+              {productsPage.page > 1 ? (
+                <Link
+                  href={`/inventory/products?page=${productsPage.page - 1}`}
+                  className="btn-secondary rounded-lg px-3 py-1.5 text-xs font-medium"
+                >
+                  Previous
+                </Link>
+              ) : (
+                <span className="rounded-lg border border-border/40 px-3 py-1.5 text-muted-foreground/60">
+                  Previous
+                </span>
+              )}
+              <span>
+                Page {productsPage.page} of {productsPage.pageCount}
+              </span>
+              {productsPage.page < productsPage.pageCount ? (
+                <Link
+                  href={`/inventory/products?page=${productsPage.page + 1}`}
+                  className="btn-secondary rounded-lg px-3 py-1.5 text-xs font-medium"
+                >
+                  Next
+                </Link>
+              ) : (
+                <span className="rounded-lg border border-border/40 px-3 py-1.5 text-muted-foreground/60">
+                  Next
+                </span>
+              )}
+            </div>
           </div>
         </section>
       )}

@@ -89,13 +89,20 @@ export type EventPerformanceMetricsInput = {
     name: string;
     tickets_sold: number;
   }>;
+  revenueRows: Array<{
+    id: string;
+    name: string;
+    revenue: unknown;
+  }>;
   tableRows: EventRecord[];
+  tableRowsTotalCount: number;
 };
 
 export type EventPerformanceMetricsResult = {
   metrics: EventPerformanceDomainMetrics;
   context: {
     tableRows: EventRecord[];
+    tableRowsTotalCount: number;
   };
 };
 
@@ -106,6 +113,28 @@ type LegacyDashboardStat = {
   change: number;
   trend: ReturnType<typeof toTrend>;
 };
+
+type EventPerformanceTablePagination = {
+  page?: number;
+  pageSize?: number;
+};
+
+const DEFAULT_EVENT_TABLE_PAGE_SIZE = 30;
+const MAX_EVENT_TABLE_PAGE_SIZE = 100;
+
+function normalizePage(value: number | undefined) {
+  if (!value || !Number.isFinite(value) || value < 1) {
+    return 1;
+  }
+  return Math.floor(value);
+}
+
+function normalizePageSize(value: number | undefined) {
+  if (!value || !Number.isFinite(value) || value < 1) {
+    return DEFAULT_EVENT_TABLE_PAGE_SIZE;
+  }
+  return Math.min(Math.floor(value), MAX_EVENT_TABLE_PAGE_SIZE);
+}
 
 export type LegacyDashboardEventData = {
   stats: LegacyDashboardStat[];
@@ -310,17 +339,26 @@ export function mapEventIntelligenceToInsights(
 export async function fetchEventPerformanceMetricsInput(params: {
   workspaceId: string;
   now?: Date;
-  includeTableRows?: boolean;
+  includeTableRows?: boolean | EventPerformanceTablePagination;
 }): Promise<EventPerformanceMetricsInput> {
   const now = params.now ?? new Date();
   const periodStart = startOfDay(subMonths(now, 6));
   const periodEnd = endOfDay(now);
+  const includeTableRows = Boolean(params.includeTableRows);
+  const tablePagination =
+    typeof params.includeTableRows === "object" ? params.includeTableRows : undefined;
+  const shouldCountTableRows = includeTableRows && Boolean(tablePagination);
+  const tablePage = normalizePage(tablePagination?.page);
+  const tablePageSize = normalizePageSize(tablePagination?.pageSize);
+  const tableSkip = (tablePage - 1) * tablePageSize;
 
-  const eventRowsPromise = params.includeTableRows
+  const eventRowsPromise = includeTableRows
     ? prisma.event.findMany({
         where: {
           workspace_id: params.workspaceId,
         },
+        skip: tableSkip,
+        take: tablePageSize,
         include: {
           venue: {
             select: {
@@ -332,8 +370,15 @@ export async function fetchEventPerformanceMetricsInput(params: {
         orderBy: [{ date: "desc" }, { start_time: "desc" }],
       })
     : Promise.resolve([]);
+  const eventRowsTotalCountPromise = shouldCountTableRows
+    ? prisma.event.count({
+        where: {
+          workspace_id: params.workspaceId,
+        },
+      })
+    : Promise.resolve(0);
 
-  const [dailyAggregateRows, attendanceRows, distributionRows, eventRows] =
+  const [dailyAggregateRows, attendanceRows, distributionRows, revenueRows, eventRows, tableRowsTotalCount] =
     await Promise.all([
       getWorkspaceDailyAggregates({
         workspaceId: params.workspaceId,
@@ -344,7 +389,7 @@ export async function fetchEventPerformanceMetricsInput(params: {
         where: {
           workspace_id: params.workspaceId,
         },
-        take: 8,
+        take: 10,
         orderBy: [{ attendance_count: "desc" }, { date: "desc" }],
         select: {
           id: true,
@@ -370,7 +415,23 @@ export async function fetchEventPerformanceMetricsInput(params: {
           tickets_sold: true,
         },
       }),
+      prisma.event.findMany({
+        where: {
+          workspace_id: params.workspaceId,
+          revenue: {
+            gt: 0,
+          },
+        },
+        take: 10,
+        orderBy: [{ revenue: "desc" }, { date: "desc" }],
+        select: {
+          id: true,
+          name: true,
+          revenue: true,
+        },
+      }),
       eventRowsPromise,
+      eventRowsTotalCountPromise,
     ]);
 
   return {
@@ -380,7 +441,9 @@ export async function fetchEventPerformanceMetricsInput(params: {
     dailyAggregateRows,
     attendanceRows,
     distributionRows,
+    revenueRows,
     tableRows: eventRows.map((event) => mapEventRecord(event)),
+    tableRowsTotalCount: shouldCountTableRows ? tableRowsTotalCount : eventRows.length,
   };
 }
 
@@ -550,25 +613,17 @@ export function buildEventPerformanceDomainMetrics(
     value: row.tickets_sold,
   }));
 
-  const attendanceReport = input.tableRows
-    .slice()
-    .sort((a, b) => b.actual_attendees - a.actual_attendees)
-    .slice(0, 10)
-    .map((row) => ({
-      id: row.id,
-      label: row.name,
-      value: row.actual_attendees,
-    }));
+  const attendanceReport = input.attendanceRows.map((row) => ({
+    id: row.id,
+    label: row.name,
+    value: row.attendance_count,
+  }));
 
-  const revenueReport = input.tableRows
-    .slice()
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 10)
-    .map((row) => ({
-      id: row.id,
-      label: row.name,
-      value: row.revenue,
-    }));
+  const revenueReport = input.revenueRows.map((row) => ({
+    id: row.id,
+    label: row.name,
+    value: toNumber(row.revenue),
+  }));
 
   return {
     totals: {
@@ -736,13 +791,14 @@ export function buildEventPerformanceDomainMetrics(
 export async function getEventPerformanceMetrics(params: {
   workspaceId: string;
   now?: Date;
-  includeTableRows?: boolean;
+  includeTableRows?: boolean | EventPerformanceTablePagination;
 }): Promise<EventPerformanceMetricsResult> {
   const input = await fetchEventPerformanceMetricsInput(params);
   return {
     metrics: buildEventPerformanceDomainMetrics(input),
     context: {
       tableRows: input.tableRows,
+      tableRowsTotalCount: input.tableRowsTotalCount,
     },
   };
 }

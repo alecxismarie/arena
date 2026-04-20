@@ -3,7 +3,6 @@ import { getAuthContext } from "@/lib/auth";
 import { getInventoryProducts } from "@/lib/inventory";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
 
 export default async function NewInventoryDailyReportPage() {
   const context = await getAuthContext();

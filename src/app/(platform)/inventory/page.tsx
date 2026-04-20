@@ -13,7 +13,6 @@ import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
 
 type InventoryPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

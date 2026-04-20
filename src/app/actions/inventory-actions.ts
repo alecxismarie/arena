@@ -3,12 +3,13 @@
 import { Prisma } from "@prisma/client";
 import { assertCanOperateInventory, canViewFinancial } from "@/lib/access-control";
 import { requireAuthContext } from "@/lib/auth";
+import { getDomainUsageCacheTag } from "@/lib/domain-focus";
 import {
   createDailyInventoryReport,
   createInventoryProduct,
 } from "@/lib/inventory";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 type ProductFormState = {
@@ -189,6 +190,7 @@ export async function createProductAction(
     };
   }
 
+  revalidateTag(getDomainUsageCacheTag(context.workspaceId), "max");
   revalidatePath("/inventory");
   revalidatePath("/inventory/products");
   redirect("/inventory/products");
@@ -253,6 +255,7 @@ export async function createDailyProductReportAction(
     };
   }
 
+  revalidateTag(getDomainUsageCacheTag(context.workspaceId), "max");
   revalidatePath("/inventory");
   revalidatePath("/inventory/reports/new");
   redirect("/inventory");
@@ -290,6 +293,7 @@ export async function setProductStatusAction(formData: FormData) {
     },
   });
 
+  revalidateTag(getDomainUsageCacheTag(context.workspaceId), "max");
   revalidatePath("/inventory");
   revalidatePath("/inventory/products");
   revalidatePath("/inventory/reports/new");

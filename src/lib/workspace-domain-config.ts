@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
+import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import {
   ANALYSIS_DOMAINS,
@@ -43,6 +44,11 @@ export type ResolvedWorkspaceDomainState = {
 const DOMAIN_INDEX = new Map(
   ANALYSIS_DOMAINS.map((domain, index) => [domain, index]),
 );
+const DOMAIN_CONFIG_CACHE_SECONDS = 30;
+
+export function getWorkspaceDomainConfigCacheTag(workspaceId: string) {
+  return `workspace-domain-config:${workspaceId}`;
+}
 
 function sortDomainsCanonical(domains: AnalysisDomain[]) {
   const unique = Array.from(new Set(domains));
@@ -192,13 +198,19 @@ export function normalizeWorkspaceDomainConfigForPersistence(params: {
 const getWorkspaceDomainConfigRow = cache(async function getWorkspaceDomainConfigRow(
   workspaceId: string,
 ) {
-  return prisma.workspace.findUnique({
-    where: { id: workspaceId },
-    select: {
-      primary_domain: true,
-      enabled_domains: true,
-    },
-  });
+  const cacheTag = getWorkspaceDomainConfigCacheTag(workspaceId);
+  return unstable_cache(
+    async () =>
+      prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: {
+          primary_domain: true,
+          enabled_domains: true,
+        },
+      }),
+    [cacheTag],
+    { revalidate: DOMAIN_CONFIG_CACHE_SECONDS, tags: [cacheTag] },
+  )();
 });
 
 function mapHeuristicPrimaryDomainToCanonical(

@@ -99,11 +99,27 @@ function mapDailyReport(record: {
 
 const ISO_DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const DEFAULT_LOOKBACK_DAYS = 14;
+const DEFAULT_PRODUCT_PAGE_SIZE = 25;
+const MAX_PRODUCT_PAGE_SIZE = 100;
 
 export function normalizeInventoryDateKey(value: string | null | undefined) {
   const normalized = String(value ?? "").trim();
   if (!ISO_DATE_KEY_REGEX.test(normalized)) return null;
   return normalized;
+}
+
+function normalizePage(value: number | undefined) {
+  if (!value || !Number.isFinite(value) || value < 1) {
+    return 1;
+  }
+  return Math.floor(value);
+}
+
+function normalizePageSize(value: number | undefined) {
+  if (!value || !Number.isFinite(value) || value < 1) {
+    return DEFAULT_PRODUCT_PAGE_SIZE;
+  }
+  return Math.min(Math.floor(value), MAX_PRODUCT_PAGE_SIZE);
 }
 
 function buildUtcDayRange(dateKey: string) {
@@ -253,6 +269,61 @@ async function fetchLookbackRevenueRows(
 export async function getInventoryProducts() {
   const context = await requireAuthContext();
   return fetchProductsForWorkspace(context.workspaceId);
+}
+
+export async function getInventoryProductsPage(params?: {
+  page?: number;
+  pageSize?: number;
+}) {
+  const context = await requireAuthContext();
+  const page = normalizePage(params?.page);
+  const pageSize = normalizePageSize(params?.pageSize);
+  const skip = (page - 1) * pageSize;
+
+  const [totalCount, rows] = await Promise.all([
+    prisma.product.count({
+      where: {
+        workspace_id: context.workspaceId,
+      },
+    }),
+    prisma.product.findMany({
+      where: {
+        workspace_id: context.workspaceId,
+      },
+      orderBy: [{ is_active: "desc" }, { name: "asc" }],
+      skip,
+      take: pageSize,
+      select: {
+        id: true,
+        name: true,
+        selling_price: true,
+        cost_price: true,
+        yield_per_recipe: true,
+        category: true,
+        is_active: true,
+        created_at: true,
+        updated_at: true,
+      },
+    }),
+  ]);
+
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
+  const boundedPage = Math.min(page, pageCount);
+
+  if (boundedPage !== page) {
+    return getInventoryProductsPage({
+      page: boundedPage,
+      pageSize,
+    });
+  }
+
+  return {
+    page,
+    pageSize,
+    pageCount,
+    totalCount,
+    products: rows.map((row) => mapProduct(row)),
+  };
 }
 
 export async function getInventoryDailyReports() {

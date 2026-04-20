@@ -137,17 +137,57 @@ export async function getEventById(eventId: string) {
   };
 }
 
-export async function getReportsData() {
+export async function getReportsData(params?: {
+  tablePage?: number;
+  tablePageSize?: number;
+  includeEventSummaryRows?: boolean;
+}) {
   const context = await requireAuthContext();
+  const hasTablePagination =
+    typeof params?.tablePage === "number" ||
+    typeof params?.tablePageSize === "number";
+  const tablePage = typeof params?.tablePage === "number" ? params.tablePage : 1;
+  const tablePageSize =
+    typeof params?.tablePageSize === "number" ? params.tablePageSize : 30;
+  const includeEventSummaryRows = params?.includeEventSummaryRows ?? true;
   const { metrics, context: metricsContext } = await getEventPerformanceMetrics({
     workspaceId: context.workspaceId,
-    includeTableRows: true,
+    includeTableRows: includeEventSummaryRows
+      ? hasTablePagination
+        ? {
+            page: tablePage,
+            pageSize: tablePageSize,
+          }
+        : true
+      : false,
   });
+
+  if (
+    hasTablePagination &&
+    includeEventSummaryRows &&
+    tablePage > 1 &&
+    metricsContext.tableRowsTotalCount > 0 &&
+    metricsContext.tableRows.length === 0
+  ) {
+    const boundedPage = Math.max(
+      1,
+      Math.ceil(metricsContext.tableRowsTotalCount / tablePageSize),
+    );
+    if (boundedPage !== tablePage) {
+      return getReportsData({
+        tablePage: boundedPage,
+        tablePageSize,
+        includeEventSummaryRows: true,
+      });
+    }
+  }
+
   return {
     ...mapEventPerformanceMetricsToLegacyReportsData({
       metrics,
       tableRows: metricsContext.tableRows,
     }),
+    eventSummaryRowCount: metricsContext.tableRowsTotalCount,
     // Transitional Phase 4A surface for direct UI consumption.
     domainMetrics: metrics,
   };

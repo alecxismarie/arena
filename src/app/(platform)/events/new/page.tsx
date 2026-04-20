@@ -5,7 +5,6 @@ import { getPreferredVenueForNewEvent, getVenues } from "@/lib/analytics";
 import { getWorkspaceById } from "@/lib/workspace";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
 
 export default async function NewEventPage() {
   const context = await getAuthContext();

@@ -1,5 +1,5 @@
 import { getAuthContext } from "@/lib/auth";
-import { getAssetUtilizationData } from "@/lib/asset";
+import { getAssetRecordsPage, getAssetUtilizationData } from "@/lib/asset";
 import {
   selectInsights,
   selectRatioMetric,
@@ -10,7 +10,11 @@ import { getWorkspaceById } from "@/lib/workspace";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+type AssetsPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+const ASSET_RECORDS_PAGE_SIZE = 25;
 
 function formatRate(value: number | null) {
   if (value === null) return "--";
@@ -27,19 +31,33 @@ function insightClass(level: "positive" | "warning" | "neutral") {
   return "border-border bg-background text-muted-foreground";
 }
 
-export default async function AssetsPage() {
+function parsePage(raw: string | string[] | undefined) {
+  const normalized = Array.isArray(raw) ? raw[0] : raw;
+  if (!normalized) return 1;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.floor(parsed);
+}
+
+export default async function AssetsPage({ searchParams }: AssetsPageProps) {
   const context = await getAuthContext();
   if (!context) {
     redirect("/");
   }
 
+  const params = await searchParams;
+  const requestedPage = parsePage(params.page);
   const canViewFinancial = context.role === "owner";
-  const [data, workspace] = await Promise.all([
+  const [data, workspace, paginatedRecords] = await Promise.all([
     getAssetUtilizationData(),
     getWorkspaceById(context.workspaceId),
+    getAssetRecordsPage({
+      page: requestedPage,
+      pageSize: ASSET_RECORDS_PAGE_SIZE,
+    }),
   ]);
 
-  if (data.records.length === 0) {
+  if (paginatedRecords.totalCount === 0) {
     return (
       <div className="space-y-7">
         <header className="rounded-[1.85rem] border border-border/70 bg-gradient-to-br from-card via-card to-surface/80 p-6 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.88)]">
@@ -191,7 +209,7 @@ export default async function AssetsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.records.map((row) => {
+              {paginatedRecords.records.map((row) => {
                 const rowUtilization =
                   row.total_assets > 0 ? row.booked_assets / row.total_assets : null;
 
@@ -221,6 +239,45 @@ export default async function AssetsPage() {
               })}
             </tbody>
           </table>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+          <span>
+            Showing{" "}
+            {`${(paginatedRecords.page - 1) * paginatedRecords.pageSize + 1}-${Math.min(
+              paginatedRecords.page * paginatedRecords.pageSize,
+              paginatedRecords.totalCount,
+            )}`}{" "}
+            of {formatNumber(paginatedRecords.totalCount)} records
+          </span>
+          <div className="flex items-center gap-2">
+            {paginatedRecords.page > 1 ? (
+              <Link
+                href={`/assets?page=${paginatedRecords.page - 1}`}
+                className="btn-secondary rounded-lg px-3 py-1.5 text-xs font-medium"
+              >
+                Previous
+              </Link>
+            ) : (
+              <span className="rounded-lg border border-border/40 px-3 py-1.5 text-muted-foreground/60">
+                Previous
+              </span>
+            )}
+            <span>
+              Page {paginatedRecords.page} of {paginatedRecords.pageCount}
+            </span>
+            {paginatedRecords.page < paginatedRecords.pageCount ? (
+              <Link
+                href={`/assets?page=${paginatedRecords.page + 1}`}
+                className="btn-secondary rounded-lg px-3 py-1.5 text-xs font-medium"
+              >
+                Next
+              </Link>
+            ) : (
+              <span className="rounded-lg border border-border/40 px-3 py-1.5 text-muted-foreground/60">
+                Next
+              </span>
+            )}
+          </div>
         </div>
       </section>
     </div>

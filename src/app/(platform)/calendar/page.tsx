@@ -12,7 +12,6 @@ import { addDays, format } from "date-fns";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
 
 export default async function CalendarPage() {
   const context = await getAuthContext();

@@ -6,6 +6,9 @@ import {
 } from "@/lib/domains/asset-utilization-metrics";
 import { prisma } from "@/lib/prisma";
 
+const DEFAULT_ASSET_PAGE_SIZE = 25;
+const MAX_ASSET_PAGE_SIZE = 100;
+
 function toNumber(value: unknown) {
   if (typeof value === "number") return value;
   if (value === null || value === undefined) return 0;
@@ -36,6 +39,20 @@ function mapAssetRecord(record: {
   };
 }
 
+function normalizePage(value: number | undefined) {
+  if (!value || !Number.isFinite(value) || value < 1) {
+    return 1;
+  }
+  return Math.floor(value);
+}
+
+function normalizePageSize(value: number | undefined) {
+  if (!value || !Number.isFinite(value) || value < 1) {
+    return DEFAULT_ASSET_PAGE_SIZE;
+  }
+  return Math.min(Math.floor(value), MAX_ASSET_PAGE_SIZE);
+}
+
 export async function getAssetRecords() {
   const context = await requireAuthContext();
   const rows = await prisma.assetRecord.findMany({
@@ -57,6 +74,61 @@ export async function getAssetRecords() {
   });
 
   return rows.map((row) => mapAssetRecord(row));
+}
+
+export async function getAssetRecordsPage(params?: {
+  page?: number;
+  pageSize?: number;
+}) {
+  const context = await requireAuthContext();
+  const page = normalizePage(params?.page);
+  const pageSize = normalizePageSize(params?.pageSize);
+  const skip = (page - 1) * pageSize;
+
+  const [totalCount, rows] = await Promise.all([
+    prisma.assetRecord.count({
+      where: {
+        workspace_id: context.workspaceId,
+      },
+    }),
+    prisma.assetRecord.findMany({
+      where: {
+        workspace_id: context.workspaceId,
+      },
+      orderBy: [{ record_date: "desc" }, { created_at: "desc" }],
+      skip,
+      take: pageSize,
+      select: {
+        id: true,
+        asset_name: true,
+        record_date: true,
+        total_assets: true,
+        booked_assets: true,
+        idle_assets: true,
+        revenue: true,
+        created_at: true,
+        updated_at: true,
+      },
+    }),
+  ]);
+
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
+  const boundedPage = Math.min(page, pageCount);
+
+  if (boundedPage !== page) {
+    return getAssetRecordsPage({
+      page: boundedPage,
+      pageSize,
+    });
+  }
+
+  return {
+    page,
+    pageSize,
+    pageCount,
+    totalCount,
+    records: rows.map((row) => mapAssetRecord(row)),
+  };
 }
 
 export async function getAssetUtilizationData() {

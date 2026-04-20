@@ -3,9 +3,10 @@
 import { EventStatus } from "@prisma/client";
 import { assertCanOperateEvents } from "@/lib/access-control";
 import { requireAuthContext } from "@/lib/auth";
+import { getCalendarNavCacheTag, getDomainUsageCacheTag } from "@/lib/domain-focus";
 import { prisma } from "@/lib/prisma";
 import { recomputeWorkspaceDailyAggregates } from "@/lib/workspace-daily-aggregates";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 type EventPayload = {
@@ -119,6 +120,11 @@ function parseStatus(
 function deriveCanonicalRevenue(ticketsSold: number, ticketPrice: number) {
   // Runtime reporting uses Event-level rollups as canonical values.
   return Number((ticketsSold * ticketPrice).toFixed(2));
+}
+
+function revalidateEventDomainCaches(workspaceId: string) {
+  revalidateTag(getCalendarNavCacheTag(workspaceId), "max");
+  revalidateTag(getDomainUsageCacheTag(workspaceId), "max");
 }
 
 function buildEventPayload(
@@ -300,6 +306,7 @@ export async function createEventAction(formData: FormData) {
   });
 
   await recomputeWorkspaceDailyAggregates(context.workspaceId);
+  revalidateEventDomainCaches(context.workspaceId);
 
   revalidatePath("/dashboard");
   revalidatePath("/calendar");
@@ -357,6 +364,7 @@ export async function updateEventAction(formData: FormData) {
   }
 
   await recomputeWorkspaceDailyAggregates(context.workspaceId);
+  revalidateEventDomainCaches(context.workspaceId);
 
   revalidatePath("/dashboard");
   revalidatePath("/calendar");
@@ -414,6 +422,7 @@ export async function rescheduleEventAction(formData: FormData) {
   }
 
   await recomputeWorkspaceDailyAggregates(context.workspaceId);
+  revalidateEventDomainCaches(context.workspaceId);
 
   revalidatePath("/dashboard");
   revalidatePath("/calendar");
@@ -441,6 +450,7 @@ export async function cancelEventAction(formData: FormData) {
   }
 
   await recomputeWorkspaceDailyAggregates(context.workspaceId);
+  revalidateEventDomainCaches(context.workspaceId);
 
   revalidatePath("/dashboard");
   revalidatePath("/calendar");

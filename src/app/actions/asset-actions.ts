@@ -2,8 +2,9 @@
 
 import { assertCanOperateAssets, canViewFinancial } from "@/lib/access-control";
 import { requireAuthContext } from "@/lib/auth";
+import { getCalendarNavCacheTag, getDomainUsageCacheTag } from "@/lib/domain-focus";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 
 type AssetFormState = {
@@ -141,6 +142,8 @@ export async function createAssetRecordAction(
     };
   }
 
+  revalidateTag(getCalendarNavCacheTag(context.workspaceId), "max");
+  revalidateTag(getDomainUsageCacheTag(context.workspaceId), "max");
   revalidatePath("/assets");
   redirect("/assets");
 }
