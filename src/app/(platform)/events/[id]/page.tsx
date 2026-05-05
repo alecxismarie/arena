@@ -79,6 +79,8 @@ export default async function EventDetailPage({
       : salesTrend;
   const insightItems = selectInsights(domainMetrics);
   const intelligenceMessage = insightItems[0]?.message ?? intelligence.message;
+  const attendanceSourceLabel =
+    event.attendance_source === "manual" ? "Manual entry" : event.attendance_source;
 
   return (
     <div className="space-y-7">
@@ -158,7 +160,7 @@ export default async function EventDetailPage({
         </article>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Attendance Variance</p>
           <p className="mt-2 text-2xl font-semibold text-foreground">
@@ -172,6 +174,20 @@ export default async function EventDetailPage({
             {(summaryAttendanceRate * 100).toFixed(1)}%
           </p>
           <p className="mt-1 text-xs text-muted-foreground">Actual attendance divided by expected attendance</p>
+        </article>
+        <article className="rounded-2xl border border-border/70 bg-gradient-to-b from-card to-card/92 p-4 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.74)]">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Attendance Source</p>
+          <p className="mt-2 text-2xl font-semibold text-foreground">
+            {attendanceSourceLabel}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Actual attendance is currently manually entered.
+          </p>
+          {event.manual_attendance_notes ? (
+            <p className="mt-3 rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-sm text-muted-foreground">
+              {event.manual_attendance_notes}
+            </p>
+          ) : null}
         </article>
       </section>
 

@@ -21,6 +21,8 @@ type EventPayload = {
   ticket_price: number;
   tickets_sold: number;
   attendance_count: number;
+  attendance_source: string;
+  manual_attendance_notes: string | null;
   revenue: number;
   status: EventStatus;
   venue_name: string | null;
@@ -117,6 +119,31 @@ function parseStatus(
   throw new Error("Invalid status");
 }
 
+function parseAttendanceSource(value: FormDataEntryValue | null) {
+  const normalized = String(value ?? "manual")
+    .trim()
+    .toLowerCase();
+
+  if (!normalized || normalized === "manual") {
+    return "manual";
+  }
+
+  throw new Error("Invalid attendance source");
+}
+
+function parseOptionalText(
+  value: FormDataEntryValue | null,
+  field: string,
+  maxLength: number,
+) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return null;
+  if (normalized.length > maxLength) {
+    throw new Error(`${field} must be ${maxLength} characters or less`);
+  }
+  return normalized;
+}
+
 function deriveCanonicalRevenue(ticketsSold: number, ticketPrice: number) {
   // Runtime reporting uses Event-level rollups as canonical values.
   return Number((ticketsSold * ticketPrice).toFixed(2));
@@ -193,6 +220,12 @@ function buildEventPayload(
   }
 
   const revenue = deriveCanonicalRevenue(tickets_sold, ticket_price);
+  const attendance_source = parseAttendanceSource(formData.get("attendance_source"));
+  const manual_attendance_notes = parseOptionalText(
+    formData.get("manual_attendance_notes"),
+    "manual attendance notes",
+    500,
+  );
   const venue_id = String(formData.get("venue_id") ?? "").trim() || null;
   const venue_name = String(formData.get("venue_name") ?? "").trim() || null;
 
@@ -208,6 +241,8 @@ function buildEventPayload(
     ticket_price,
     tickets_sold,
     attendance_count: actual_attendees,
+    attendance_source,
+    manual_attendance_notes,
     revenue,
     status: parseStatus(formData.get("status"), {
       defaultStatus: options.defaultStatus,

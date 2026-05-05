@@ -109,6 +109,7 @@ export function EventForm({
 
       <form action={action} className="space-y-5">
         {event ? <input type="hidden" name="event_id" value={event.id} /> : null}
+        <input type="hidden" name="attendance_source" value="manual" />
 
         <div className="grid gap-4 lg:grid-cols-2">
           <label className="space-y-2 text-sm">
@@ -269,7 +270,7 @@ export function EventForm({
               </label>
 
               <label className="space-y-2 text-sm">
-                <span className="font-medium text-foreground">Actual attendance</span>
+                <span className="font-medium text-foreground">Actual attendance (manual)</span>
                 <input
                   defaultValue={event.actual_attendees}
                   type="number"
@@ -278,10 +279,32 @@ export function EventForm({
                   required
                   className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
                 />
+                <span className="block text-xs text-muted-foreground">
+                  Source: Manual entry. This count is not scanner-derived.
+                </span>
               </label>
             </>
           ) : null}
         </div>
+
+        {event ? (
+          <label className="block space-y-2 text-sm">
+            <span className="font-medium text-foreground">
+              Manual attendance note (optional)
+            </span>
+            <textarea
+              defaultValue={event.manual_attendance_notes ?? ""}
+              name="manual_attendance_notes"
+              rows={3}
+              maxLength={500}
+              placeholder="Reason or context for the manually entered attendance count"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 outline-none transition focus:border-accent/70 focus:ring-2 focus:ring-accent/10"
+            />
+            <span className="block text-xs text-muted-foreground">
+              Use this when the manually entered actual attendance is updated.
+            </span>
+          </label>
+        ) : null}
 
         <div className="flex flex-wrap gap-2 pt-1">
           <button

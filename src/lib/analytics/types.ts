@@ -13,6 +13,8 @@ export type EventRecord = {
   ticket_price: number;
   tickets_sold: number;
   actual_attendees: number;
+  attendance_source: string;
+  manual_attendance_notes: string | null;
   revenue: number;
   venue: {
     id: string;

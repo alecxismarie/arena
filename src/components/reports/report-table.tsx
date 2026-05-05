@@ -13,6 +13,8 @@ type EventSummaryRow = {
   expected_attendees: number;
   tickets_sold: number;
   actual_attendees: number;
+  attendance_source?: string;
+  manual_attendance_notes?: string | null;
   attendance_variance: number;
   attendance_rate: number;
   revenue?: number;
@@ -143,6 +145,7 @@ export function ReportTable({
               <th className="px-3 py-2">Tickets</th>
               <th className="px-3 py-2">Expected</th>
               <th className="px-3 py-2">Actual</th>
+              <th className="px-3 py-2">Source</th>
               <th className="px-3 py-2">Variance</th>
               <th className="px-3 py-2">Rate</th>
               {showRevenue ? <th className="px-3 py-2">Revenue</th> : null}
@@ -163,6 +166,16 @@ export function ReportTable({
                 <td className="px-3 py-3">{formatNumber(row.tickets_sold)}</td>
                 <td className="px-3 py-3">{formatNumber(row.expected_attendees)}</td>
                 <td className="px-3 py-3">{formatNumber(row.actual_attendees)}</td>
+                <td className="px-3 py-3 text-muted-foreground">
+                  <span className="block capitalize">
+                    {(row.attendance_source ?? "manual").replaceAll("_", " ")}
+                  </span>
+                  {row.manual_attendance_notes ? (
+                    <span className="mt-1 block max-w-56 text-xs">
+                      {row.manual_attendance_notes}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-3 py-3">{formatNumber(row.attendance_variance)}</td>
                 <td className="px-3 py-3">{(row.attendance_rate * 100).toFixed(1)}%</td>
                 {showRevenue ? (

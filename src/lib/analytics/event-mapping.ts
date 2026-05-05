@@ -14,6 +14,8 @@ export type EventWithVenue = {
   ticket_price: unknown;
   tickets_sold: number;
   attendance_count: number;
+  attendance_source?: string | null;
+  manual_attendance_notes?: string | null;
   revenue: unknown;
   venue?: {
     id: string;
@@ -51,6 +53,8 @@ export function mapEventRecord(event: EventWithVenue): EventRecord {
     ticket_price: toNumber(event.ticket_price),
     tickets_sold: event.tickets_sold,
     actual_attendees: event.attendance_count,
+    attendance_source: event.attendance_source?.trim() || "manual",
+    manual_attendance_notes: event.manual_attendance_notes ?? null,
     revenue: toNumber(event.revenue),
     venue: event.venue
       ? {

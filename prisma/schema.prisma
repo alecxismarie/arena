@@ -87,6 +87,8 @@ model Event {
   ticket_price       Decimal         @db.Decimal(10, 2)
   tickets_sold       Int             @default(0)
   attendance_count   Int             @default(0)
+  attendance_source  String          @default("manual")
+  manual_attendance_notes String?
   revenue            Decimal         @default(0) @db.Decimal(12, 2)
   status             EventStatus     @default(upcoming)
   created_at         DateTime        @default(now())

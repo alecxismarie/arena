@@ -440,7 +440,7 @@ export default async function DashboardPage() {
               Event attendance: expected vs actual
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Compare planned turnout with actual attendance across events.
+              Compare planned turnout with manually entered actual attendance across events.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <article className="rounded-2xl border border-border/70 bg-background/80 p-3">

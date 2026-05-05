@@ -326,6 +326,8 @@ function renderEventsSection(params: {
                 expected_attendees: row.expected_attendees,
                 tickets_sold: row.tickets_sold,
                 actual_attendees: row.actual_attendees,
+                attendance_source: row.attendance_source,
+                manual_attendance_notes: row.manual_attendance_notes,
                 attendance_variance: row.attendance_variance,
                 attendance_rate: row.attendance_rate,
               },
