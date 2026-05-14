@@ -12,6 +12,12 @@ import {
   setRememberPreferenceCookie,
   startWorkspaceSession,
 } from "@/lib/auth";
+import {
+  assertOnboardingRuntimeEnv,
+  AuthFlowError,
+  createAuthConfigurationError,
+  logAuthFlowError,
+} from "@/lib/auth-errors";
 import { sendVerificationMagicLinkEmail } from "@/lib/brevo";
 import { prisma } from "@/lib/prisma";
 import {
@@ -34,16 +40,16 @@ export type StartOnboardingResult =
 function parseEmail(value: FormDataEntryValue | null) {
   const email = String(value ?? "").trim().toLowerCase();
   if (!email) {
-    throw new Error("Email is required");
+    throw new AuthFlowError("validation", "Email is required");
   }
 
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailPattern.test(email)) {
-    throw new Error("A valid email is required");
+    throw new AuthFlowError("validation", "A valid email is required");
   }
 
   if (email.length > 254) {
-    throw new Error("Email is too long");
+    throw new AuthFlowError("validation", "Email is too long");
   }
 
   return email;
@@ -52,10 +58,13 @@ function parseEmail(value: FormDataEntryValue | null) {
 function parseWorkspaceName(value: FormDataEntryValue | null) {
   const name = String(value ?? "").trim();
   if (!name) {
-    throw new Error("Workspace name is required");
+    throw new AuthFlowError("validation", "Workspace name is required");
   }
   if (name.length > 80) {
-    throw new Error("Workspace name must be 80 characters or less");
+    throw new AuthFlowError(
+      "validation",
+      "Workspace name must be 80 characters or less",
+    );
   }
   return name;
 }
@@ -63,15 +72,21 @@ function parseWorkspaceName(value: FormDataEntryValue | null) {
 function parsePassword(value: FormDataEntryValue | null) {
   const password = String(value ?? "");
   if (!password) {
-    throw new Error("Password is required");
+    throw new AuthFlowError("validation", "Password is required");
   }
 
   if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    throw new AuthFlowError(
+      "validation",
+      `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    );
   }
 
   if (password.length > MAX_PASSWORD_LENGTH) {
-    throw new Error(`Password must be ${MAX_PASSWORD_LENGTH} characters or less`);
+    throw new AuthFlowError(
+      "validation",
+      `Password must be ${MAX_PASSWORD_LENGTH} characters or less`,
+    );
   }
 
   return password;
@@ -126,7 +141,7 @@ async function verifyPassword(password: string, passwordHash: string) {
 function getBaseUrl() {
   const baseUrl = process.env.APP_BASE_URL?.trim();
   if (!baseUrl) {
-    throw new Error("APP_BASE_URL is not configured");
+    throw createAuthConfigurationError(["APP_BASE_URL"]);
   }
   return baseUrl.replace(/\/+$/, "");
 }
@@ -158,6 +173,7 @@ export async function requestOnboardingVerification(
   const workspaceName = parseWorkspaceName(formData.get("workspace_name"));
   const password = parsePassword(formData.get("password"));
   const rememberMe = parseRememberMe(formData.get("remember_me"));
+  assertOnboardingRuntimeEnv();
   const now = new Date();
 
   const existingUser = await prisma.user.findUnique({
@@ -171,7 +187,10 @@ export async function requestOnboardingVerification(
   if (existingUser?.password_hash) {
     const isPasswordValid = await verifyPassword(password, existingUser.password_hash);
     if (!isPasswordValid) {
-      throw new Error("Invalid email, workspace, or password");
+      throw new AuthFlowError(
+        "invalid_credentials",
+        "Invalid email, workspace, or password",
+      );
     }
 
     const membership = await prisma.workspaceMembership.findFirst({
@@ -190,7 +209,10 @@ export async function requestOnboardingVerification(
     });
 
     if (!membership) {
-      throw new Error("Invalid email, workspace, or password");
+      throw new AuthFlowError(
+        "invalid_credentials",
+        "Invalid email, workspace, or password",
+      );
     }
 
     await startWorkspaceSession({
@@ -229,11 +251,17 @@ export async function requestOnboardingVerification(
   ]);
 
   if (recentRequest) {
-    throw new Error("Please wait a minute before requesting another email.");
+    throw new AuthFlowError(
+      "rate_limited",
+      "Please wait a minute before requesting another email.",
+    );
   }
 
   if (activeTokenCount >= MAX_ACTIVE_TOKENS_PER_EMAIL) {
-    throw new Error("Too many verification requests. Please try again later.");
+    throw new AuthFlowError(
+      "rate_limited",
+      "Too many verification requests. Please try again later.",
+    );
   }
 
   const token = randomBytes(32).toString("hex");
@@ -267,11 +295,18 @@ export async function requestOnboardingVerification(
       verifyUrl,
     });
   } catch (error) {
-    await prisma.emailVerificationToken.deleteMany({
-      where: {
-        token_hash: tokenHash,
-      },
-    });
+    try {
+      await prisma.emailVerificationToken.deleteMany({
+        where: {
+          token_hash: tokenHash,
+        },
+      });
+    } catch (cleanupError) {
+      logAuthFlowError(cleanupError, {
+        flow: "onboarding",
+        step: "verification_token_cleanup",
+      });
+    }
     throw error;
   }
 
@@ -289,7 +324,7 @@ type ConsumeTokenResult = {
 async function consumeVerificationToken(token: string): Promise<ConsumeTokenResult> {
   const normalizedToken = token.trim();
   if (!normalizedToken) {
-    throw new Error("Invalid verification link");
+    throw new AuthFlowError("invalid_token", "Invalid verification link");
   }
 
   const now = new Date();
@@ -309,13 +344,19 @@ async function consumeVerificationToken(token: string): Promise<ConsumeTokenResu
     });
 
     if (!record) {
-      throw new Error("Invalid verification link");
+      throw new AuthFlowError("invalid_token", "Invalid verification link");
     }
     if (record.consumed_at) {
-      throw new Error("This verification link has already been used");
+      throw new AuthFlowError(
+        "invalid_token",
+        "This verification link has already been used",
+      );
     }
     if (record.expires_at <= now) {
-      throw new Error("This verification link has expired");
+      throw new AuthFlowError(
+        "expired_token",
+        "This verification link has expired",
+      );
     }
 
     const consumed = await tx.emailVerificationToken.updateMany({
@@ -329,7 +370,10 @@ async function consumeVerificationToken(token: string): Promise<ConsumeTokenResu
     });
 
     if (consumed.count === 0) {
-      throw new Error("This verification link has already been used");
+      throw new AuthFlowError(
+        "invalid_token",
+        "This verification link has already been used",
+      );
     }
 
     return {

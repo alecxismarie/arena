@@ -34,6 +34,17 @@ function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
+const REQUIRED_PRODUCTION_ENV_VARS = [
+  "DATABASE_URL",
+  "APP_BASE_URL",
+  "BREVO_API_KEY",
+  "BREVO_SENDER_EMAIL",
+];
+
+function getMissingRequiredEnvVars(names) {
+  return names.filter((name) => !process.env[name]?.trim());
+}
+
 const vercelEnv = process.env.VERCEL_ENV?.trim().toLowerCase();
 const isProduction = vercelEnv === "production";
 const migrationStrict =
@@ -46,9 +57,11 @@ const migrationRetryCount = Math.max(
 console.log(`[vercel-build] VERCEL_ENV=${vercelEnv || "unset"}`);
 
 if (isProduction) {
-  const databaseUrl = process.env.DATABASE_URL?.trim();
-  if (!databaseUrl) {
-    throw new Error("[vercel-build] DATABASE_URL is required for production migrations.");
+  const missingEnvVars = getMissingRequiredEnvVars(REQUIRED_PRODUCTION_ENV_VARS);
+  if (missingEnvVars.length > 0) {
+    throw new Error(
+      `[vercel-build] Missing required production env vars: ${missingEnvVars.join(", ")}`,
+    );
   }
 
   console.log("[vercel-build] Running prisma migrate deploy (production only).");

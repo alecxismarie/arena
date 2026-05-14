@@ -1,3 +1,7 @@
+import {
+  getSafeAuthFlowError,
+  logAuthFlowError,
+} from "@/lib/auth-errors";
 import { completeOnboardingFromVerificationToken } from "@/lib/onboarding-auth";
 import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
@@ -32,10 +36,16 @@ export async function GET(request: NextRequest) {
     const targetUrl = new URL(result.redirectTo, request.url);
     return NextResponse.redirect(targetUrl);
   } catch (error) {
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : "This verification link is invalid or expired.";
-    return redirectToVerifyPage(request, "failed", message);
+    const safeError = getSafeAuthFlowError(error);
+    logAuthFlowError(error, {
+      flow: "onboarding",
+      step: "complete_verification",
+    });
+
+    const status =
+      safeError.code === "invalid_token" || safeError.code === "expired_token"
+        ? "invalid"
+        : "failed";
+    return redirectToVerifyPage(request, status, safeError.message);
   }
 }

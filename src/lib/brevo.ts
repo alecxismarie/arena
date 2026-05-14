@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  AuthFlowError,
+  createAuthConfigurationError,
+} from "@/lib/auth-errors";
+
 const BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 
 function escapeHtml(value: string) {
@@ -14,7 +19,7 @@ function escapeHtml(value: string) {
 function requireEnv(name: string) {
   const value = process.env[name]?.trim();
   if (!value) {
-    throw new Error(`${name} is not configured`);
+    throw createAuthConfigurationError([name]);
   }
   return value;
 }
@@ -51,7 +56,11 @@ export async function sendVerificationMagicLinkEmail(params: {
   });
 
   if (!response.ok) {
-    throw new Error("Unable to send verification email");
+    throw new AuthFlowError(
+      "email_delivery",
+      "We could not send your verification email. Please try again.",
+      { logMessage: "Brevo rejected verification email send" },
+    );
   }
 }
 
@@ -107,6 +116,10 @@ export async function sendWorkspaceInvitationEmail(params: {
   });
 
   if (!response.ok) {
-    throw new Error("Unable to send workspace invitation email");
+    throw new AuthFlowError(
+      "email_delivery",
+      "We could not send the invitation email. Please try again.",
+      { logMessage: "Brevo rejected workspace invitation email send" },
+    );
   }
 }

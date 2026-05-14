@@ -3,6 +3,11 @@ import "server-only";
 import { WorkspaceRole } from "@prisma/client";
 import { createHash, randomBytes } from "crypto";
 import { startWorkspaceSession } from "@/lib/auth";
+import {
+  AuthFlowError,
+  createAuthConfigurationError,
+  logAuthFlowError,
+} from "@/lib/auth-errors";
 import { sendWorkspaceInvitationEmail } from "@/lib/brevo";
 import { prisma } from "@/lib/prisma";
 
@@ -15,7 +20,7 @@ function hashToken(token: string) {
 function getBaseUrl() {
   const baseUrl = process.env.APP_BASE_URL?.trim();
   if (!baseUrl) {
-    throw new Error("APP_BASE_URL is not configured");
+    throw createAuthConfigurationError(["APP_BASE_URL"]);
   }
   return baseUrl.replace(/\/+$/, "");
 }
@@ -82,11 +87,18 @@ export async function createWorkspaceInvitation(params: {
       expiresAt,
     });
   } catch (error) {
-    await prisma.workspaceInvitationToken.deleteMany({
-      where: {
-        token_hash: tokenHash,
-      },
-    });
+    try {
+      await prisma.workspaceInvitationToken.deleteMany({
+        where: {
+          token_hash: tokenHash,
+        },
+      });
+    } catch (cleanupError) {
+      logAuthFlowError(cleanupError, {
+        flow: "workspace_invitation",
+        step: "invitation_token_cleanup",
+      });
+    }
     throw error;
   }
 }
@@ -98,10 +110,12 @@ type ConsumedWorkspaceInvitation = {
   invitedRole: WorkspaceRole;
 };
 
-async function consumeWorkspaceInvitationToken(token: string): Promise<ConsumedWorkspaceInvitation> {
+async function consumeWorkspaceInvitationToken(
+  token: string,
+): Promise<ConsumedWorkspaceInvitation> {
   const normalizedToken = token.trim();
   if (!normalizedToken) {
-    throw new Error("Invalid invitation link");
+    throw new AuthFlowError("invalid_token", "Invalid invitation link");
   }
 
   const now = new Date();
@@ -124,13 +138,19 @@ async function consumeWorkspaceInvitationToken(token: string): Promise<ConsumedW
     });
 
     if (!record) {
-      throw new Error("Invalid invitation link");
+      throw new AuthFlowError("invalid_token", "Invalid invitation link");
     }
     if (record.consumed_at) {
-      throw new Error("This invitation link has already been used");
+      throw new AuthFlowError(
+        "invalid_token",
+        "This invitation link has already been used",
+      );
     }
     if (record.expires_at <= now) {
-      throw new Error("This invitation link has expired");
+      throw new AuthFlowError(
+        "expired_token",
+        "This invitation link has expired",
+      );
     }
 
     const consumed = await tx.workspaceInvitationToken.updateMany({
@@ -144,7 +164,10 @@ async function consumeWorkspaceInvitationToken(token: string): Promise<ConsumedW
     });
 
     if (consumed.count === 0) {
-      throw new Error("This invitation link has already been used");
+      throw new AuthFlowError(
+        "invalid_token",
+        "This invitation link has already been used",
+      );
     }
 
     return {

@@ -71,6 +71,12 @@ function getRememberedOnboardingState(): RememberedOnboardingState {
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
+    if (
+      error.message.includes("Server Components render") ||
+      error.message.includes("digest property")
+    ) {
+      return "We could not complete onboarding. Please try again.";
+    }
     return error.message;
   }
   return "We could not send your verification email. Please try again.";
@@ -159,6 +165,16 @@ export function OnboardingForm() {
     try {
       const result = await startOnboardingClientAction(formData);
       clearMilestoneTimers();
+
+      if ("error" in result) {
+        setIsSubmitting(false);
+        setActualProgress(0);
+        setDisplayProgress(0);
+        setStageIndex(0);
+        setErrorMessage(result.error.message);
+        return;
+      }
+
       setStageIndex(4);
       setActualProgress(100);
       await new Promise((resolve) =>
